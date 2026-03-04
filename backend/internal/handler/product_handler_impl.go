@@ -5,9 +5,11 @@ import (
 	"asset-store/internal/service"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -250,5 +252,15 @@ func (h *ProductHandlerImpl) DownloadProduct(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(product.AssetFileKey, product.Title+".zip")
+	downloadURL := product.AssetFileKey
+
+	fileName := url.QueryEscape(product.Title + ".zip")
+
+	if strings.Contains(downloadURL, "?") {
+		downloadURL += "&download=" + fileName
+	} else {
+		downloadURL += "?download=" + fileName
+	}
+
+	c.Redirect(http.StatusTemporaryRedirect, downloadURL)
 }

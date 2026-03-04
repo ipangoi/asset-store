@@ -26,19 +26,19 @@ export default function PurchasedProductCard({
   
   const imageSource = imageUrl || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80";
 
-    const handleDownload = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setPopupState("loading");
-        setTimeout(() => {
-            setPopupState("success"); 
-            window.open(`http://localhost:8080/product/${id}/download?token=${token}`, "_self");
-            
-            setTimeout(() => {
-                setPopupState("idle");
-            }, 2000);
-        }, 1000);
-    };
+  const handleDownload = async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setPopupState("loading");
+      setTimeout(() => {
+          setPopupState("success"); 
+          window.open(`/api/product/${id}/download?token=${token}`, "_blank");
+          
+          setTimeout(() => {
+              setPopupState("idle");
+          }, 2000);
+      }, 1000);
+  };
 
   return (
     <div className="relative h-full flex flex-col overflow-hidden rounded-xl bg-white border-4 border-black shadow-[2px_2px_0px_0px_#000] transition-all">
