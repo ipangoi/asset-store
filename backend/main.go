@@ -1,6 +1,7 @@
 package main
 
 import (
+	"asset-store/internal/config"
 	"asset-store/internal/router"
 	"log"
 	"os"
@@ -17,6 +18,8 @@ func main() {
 
 	midtrans.ServerKey = os.Getenv("MIDTRANS_SERVER_KEY")
 	midtrans.Environment = midtrans.Sandbox
+
+	config.InitRedis()
 
 	r := router.StartApp()
 	port := os.Getenv("PORT")

@@ -1,10 +1,14 @@
 package service
 
 import (
+	"asset-store/internal/config"
 	"asset-store/internal/dto"
 	"asset-store/internal/model"
 	"asset-store/internal/repository"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -39,6 +43,21 @@ func (s *productServiceImpl) CreateProduct(title, desc string, price int, thumbn
 		_ = s.userRepo.UpdateRole(userID, "seller")
 	}
 
+	response := dto.ProductResponse{
+		ID:           newProduct.ID.String(),
+		Title:        newProduct.Title,
+		Description:  newProduct.Description,
+		Price:        newProduct.Price,
+		ThumbnailURL: newProduct.ThumbnailURL,
+		SellerID:     newProduct.UserID.String(),
+	}
+
+	cacheKey := "product:" + newProduct.ID.String()
+	productJSON, _ := json.Marshal(response)
+	config.RedisClient.Set(config.Ctx, cacheKey, string(productJSON), 1*time.Hour)
+
+	s.clearProductsListCache()
+
 	return dto.ProductResponse{
 		ID:           newProduct.ID.String(),
 		Title:        newProduct.Title,
@@ -50,12 +69,21 @@ func (s *productServiceImpl) CreateProduct(title, desc string, price int, thumbn
 }
 
 func (s *productServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dto.ProductResponse, error) {
+	cacheKey := fmt.Sprintf("products:search:%s:limit:%d", searchQuery, limit)
+
+	var productResponses []dto.ProductResponse
+
+	cachedData, err := config.RedisClient.Get(config.Ctx, cacheKey).Result()
+	if err == nil {
+		json.Unmarshal([]byte(cachedData), &productResponses)
+		return productResponses, nil
+	}
+
 	products, err := s.productRepo.GetAllProduct(searchQuery, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	var productResponses []dto.ProductResponse
 	for _, product := range products {
 		productResponses = append(productResponses, dto.ProductResponse{
 			ID:           product.ID.String(),
@@ -69,16 +97,28 @@ func (s *productServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dt
 		})
 	}
 
+	productJSON, _ := json.Marshal(productResponses)
+	config.RedisClient.Set(config.Ctx, cacheKey, string(productJSON), 1*time.Hour)
+
 	return productResponses, nil
 }
 
 func (s *productServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, error) {
+	cacheKey := "product:" + id.String()
+
+	cachedData, err := config.RedisClient.Get(config.Ctx, cacheKey).Result()
+	if err == nil {
+		var response dto.ProductResponse
+		json.Unmarshal([]byte(cachedData), &response)
+		return response, nil
+	}
+
 	product, err := s.productRepo.GetProductByID(id)
 	if err != nil {
 		return dto.ProductResponse{}, err
 	}
 
-	return dto.ProductResponse{
+	response := dto.ProductResponse{
 		ID:           product.ID.String(),
 		Title:        product.Title,
 		Description:  product.Description,
@@ -87,7 +127,12 @@ func (s *productServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, 
 		AssetFileKey: product.AssetFileKey,
 		SellerID:     product.UserID.String(),
 		SellerName:   product.User.Name,
-	}, nil
+	}
+
+	productJSON, _ := json.Marshal(response)
+	config.RedisClient.Set(config.Ctx, cacheKey, string(productJSON), 1*time.Hour)
+
+	return response, nil
 }
 
 func (s *productServiceImpl) GetProductsBySeller(userID uuid.UUID) ([]dto.ProductResponse, error) {
@@ -138,6 +183,11 @@ func (s *productServiceImpl) UpdateProduct(id uuid.UUID, req dto.UpdateProductRe
 		return dto.ProductResponse{}, err
 	}
 
+	cacheKey := "product:" + id.String()
+	config.RedisClient.Del(config.Ctx, cacheKey)
+
+	s.clearProductsListCache()
+
 	return dto.ProductResponse{
 		ID:           updatedProduct.ID.String(),
 		Title:        updatedProduct.Title,
@@ -159,7 +209,17 @@ func (s *productServiceImpl) DeleteProduct(id uuid.UUID, userID uuid.UUID) error
 		return errors.New("Unauthorized: You are not the owner of this product")
 	}
 
-	return s.productRepo.DeleteProduct(id)
+	err = s.productRepo.DeleteProduct(id)
+	if err != nil {
+		return err
+	}
+
+	cacheKey := "product:" + id.String()
+	config.RedisClient.Del(config.Ctx, cacheKey)
+
+	s.clearProductsListCache()
+
+	return nil
 }
 
 // Save Product Implementation
@@ -202,4 +262,12 @@ func (s *productServiceImpl) GetSavedProducts(userID uuid.UUID) ([]dto.ProductRe
 
 func (s *productServiceImpl) GetSavedProductIDs(userID uuid.UUID) ([]string, error) {
 	return s.productRepo.GetSavedProductIDs(userID)
+}
+
+// redis clear get all search cache
+func (s *productServiceImpl) clearProductsListCache() {
+	keys, err := config.RedisClient.Keys(config.Ctx, "products:search:*").Result()
+	if err == nil && len(keys) > 0 {
+		config.RedisClient.Del(config.Ctx, keys...)
+	}
 }
