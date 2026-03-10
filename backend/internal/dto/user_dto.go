@@ -26,3 +26,9 @@ type UserUpdateRoleRequest struct {
 type UserUpdateProfileRequest struct {
 	Name string `json:"name" binding:"required"`
 }
+
+type UserPublicProfileResponse struct {
+	ID       string            `json:"id"`
+	Name     string            `json:"name"`
+	Products []ProductResponse `json:"products"`
+}

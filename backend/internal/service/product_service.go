@@ -7,7 +7,7 @@ import (
 )
 
 type ProductService interface {
-	CreateProduct(title, desc string, price int, thumbnailUrl, assetKey string, userID uuid.UUID) (dto.ProductResponse, error)
+	CreateProduct(req dto.CreateProductRequest, userID uuid.UUID) (dto.ProductResponse, error)
 	GetAllProducts(searchQuery string, limit int) ([]dto.ProductResponse, error)
 	GetProductByID(id uuid.UUID) (dto.ProductResponse, error)
 	GetProductsBySeller(userID uuid.UUID) ([]dto.ProductResponse, error)

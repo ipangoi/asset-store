@@ -1,10 +1,13 @@
 package service
 
 import (
+	"asset-store/internal/config"
 	"asset-store/internal/dto"
 	"asset-store/internal/model"
 	"asset-store/internal/repository"
+	"encoding/json"
 	"errors"
+	"time"
 
 	"asset-store/internal/utils"
 
@@ -13,12 +16,14 @@ import (
 )
 
 type UserServiceImpl struct {
-	userRepo repository.UserRepository
+	userRepo   repository.UserRepository
+	reviewRepo repository.ReviewRepository
 }
 
-func NewUserServiceImpl(userRepo repository.UserRepository) UserService {
-	return &UserServiceImpl{userRepo}
+func NewUserServiceImpl(userRepo repository.UserRepository, reviewRepo repository.ReviewRepository) UserService {
+	return &UserServiceImpl{userRepo, reviewRepo}
 }
+
 func (s *UserServiceImpl) Register(user dto.UserRegisterRequest) (dto.UserResponse, error) {
 	_, err := s.userRepo.GetUserByEmail(user.Email)
 	if err == nil {
@@ -109,4 +114,50 @@ func (s *UserServiceImpl) UpdateUser(req dto.UserUpdateProfileRequest, id uuid.U
 
 func (s *UserServiceImpl) UpdateRole(id uuid.UUID, req dto.UserUpdateRoleRequest) error {
 	return s.userRepo.UpdateRole(id, req.Role)
+}
+
+func (s *UserServiceImpl) GetPublicProfile(id uuid.UUID) (dto.UserPublicProfileResponse, error) {
+	cacheKey := "profile:" + id.String()
+	cachedData, err := config.RedisClient.Get(config.Ctx, cacheKey).Result()
+	if err == nil {
+		var response dto.UserPublicProfileResponse
+		json.Unmarshal([]byte(cachedData), &response)
+		return response, nil
+	}
+
+	findUser, err := s.userRepo.GetUserProfileWithProducts(id)
+	if err != nil {
+		return dto.UserPublicProfileResponse{}, err
+	}
+
+	var responses []dto.ProductResponse
+
+	for _, product := range findUser.Products {
+		rating, _ := s.reviewRepo.GetAverageRating(product.ID)
+		totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(product.ID)
+		responses = append(responses, dto.ProductResponse{
+			ID:            product.ID.String(),
+			Title:         product.Title,
+			Description:   product.Description,
+			Price:         product.Price,
+			ThumbnailURL:  product.ThumbnailURL,
+			AssetFileKey:  product.AssetFileKey,
+			SellerID:      findUser.ID.String(),
+			SellerName:    findUser.Name,
+			CategoryName:  product.Category.Name,
+			AverageRating: rating,
+			TotalReviews:  int(totalReviews),
+		})
+	}
+
+	profileResponse := dto.UserPublicProfileResponse{
+		ID:       findUser.ID.String(),
+		Name:     findUser.Name,
+		Products: responses,
+	}
+
+	profileJSON, _ := json.Marshal(profileResponse)
+	config.RedisClient.Set(config.Ctx, cacheKey, string(profileJSON), 1*time.Hour)
+
+	return profileResponse, nil
 }

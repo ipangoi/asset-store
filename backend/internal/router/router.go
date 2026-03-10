@@ -33,28 +33,33 @@ func StartApp() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	//init user
+	//init repo
 	userRepository := repository.NewUserRepositoryImpl(db)
-	userService := service.NewUserServiceImpl(userRepository)
-	userHandler := handler.NewUserHandlerImpl(userService)
-
-	//init product
 	productRepo := repository.NewProductRepositoryImpl(db)
-	productService := service.NewProductServiceImpl(productRepo, userRepository)
-
-	//init transaction
 	transactionRepo := repository.NewTransactionRepositoryImpl(db)
-	transactionService := service.NewTransactionServiceImpl(transactionRepo, userRepository, productRepo)
-	transactionHandler := handler.NewTransactionHandlerImpl(transactionService)
+	categoryRepo := repository.NewCategoryRepositoryImpl(db)
+	reviewRepo := repository.NewReviewRepositoryImpl(db)
 
-	// product
+	//init service
+	userService := service.NewUserServiceImpl(userRepository, reviewRepo)
+	productService := service.NewProductServiceImpl(productRepo, userRepository, reviewRepo)
+	transactionService := service.NewTransactionServiceImpl(transactionRepo, userRepository, productRepo)
+	categoryService := service.NewCategoryServiceImpl(categoryRepo)
+	reviewService := service.NewReviewServiceImpl(reviewRepo, productRepo, userRepository)
+
+	//init handler
+	userHandler := handler.NewUserHandlerImpl(userService)
+	transactionHandler := handler.NewTransactionHandlerImpl(transactionService)
 	productHandler := handler.NewProductHandlerImpl(productService, transactionService)
+	categoryHandler := handler.NewCategoryHandlerImpl(categoryService)
+	reviewHandler := handler.NewReviewHandlerImpl(reviewService)
 
 	//user
 	userRouter := r.Group("/user")
 	{
 		userRouter.POST("/register", userHandler.Register)
 		userRouter.POST("/login", userHandler.Login)
+		userRouter.GET("/:id", userHandler.GetPublicProfile)
 		privateUser := userRouter.Group("")
 		privateUser.Use(middleware.AuthMiddleware())
 		{
@@ -65,6 +70,9 @@ func StartApp() *gin.Engine {
 
 			privateUser.GET("/saved", productHandler.GetSavedProducts)
 			privateUser.GET("/saved-ids", productHandler.GetSavedProductIDs)
+
+			// get my-product (change in fe)
+			privateUser.GET("/my-product", productHandler.GetMyProducts)
 		}
 	}
 
@@ -73,15 +81,18 @@ func StartApp() *gin.Engine {
 	{
 		productRouter.GET("", productHandler.GetAllProduct)
 		productRouter.GET("/:id", productHandler.GetProductByID)
+		productRouter.GET("/:id/reviews", reviewHandler.GetAllReviewByProduct)
 		privateProduct := productRouter.Group("")
 		privateProduct.Use(middleware.AuthMiddleware())
 		{
-			privateProduct.GET("/my-product", productHandler.GetMyProducts)
 			privateProduct.POST("", productHandler.CreateProduct)
 			privateProduct.PUT("/:id", productHandler.UpdateProduct)
 			privateProduct.DELETE("/:id", productHandler.DeleteProduct)
 			privateProduct.POST("/:id/save", productHandler.ToggleSaveProduct)
 			privateProduct.GET("/:id/download", productHandler.DownloadProduct)
+
+			// create review
+			privateProduct.POST("/:id/reviews", reviewHandler.CreateReview)
 		}
 	}
 
@@ -94,6 +105,23 @@ func StartApp() *gin.Engine {
 		{
 			privateTransaction.POST("", transactionHandler.CreateTransaction)
 			privateTransaction.GET("", transactionHandler.GetUserTransactions)
+		}
+	}
+
+	// category
+	categoryRouter := r.Group("/category")
+	{
+		categoryRouter.GET("", categoryHandler.GetAllCategory)
+	}
+
+	//review
+	reviewRouter := r.Group("/review")
+	{
+		privateReview := reviewRouter.Group("")
+		privateReview.Use(middleware.AuthMiddleware())
+		{
+			privateReview.PUT("/:id", reviewHandler.UpdateReview)
+			privateReview.DELETE("/:id", reviewHandler.DeleteReview)
 		}
 	}
 

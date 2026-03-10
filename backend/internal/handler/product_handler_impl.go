@@ -68,16 +68,23 @@ func (h *ProductHandlerImpl) CreateProduct(c *gin.Context) {
 	}
 	defer assetFile.Close()
 
+	req.AssetFileSize = req.AssetFile.Size
+	buffer := make([]byte, 512)
+	assetFile.Read(buffer)
+	req.AssetFileType = http.DetectContentType(buffer)
+
+	assetFile.Seek(0, 0)
+
 	_, err = storageClient.UploadFile("assets-storage", assetFileName, assetFile)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload asset to cloud"})
 		return
 	}
 
-	thumbnailURL := fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, thumbnailFileName)
-	assetURL := fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, assetFileName)
+	req.ThumbnailURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, thumbnailFileName)
+	req.AssetFileURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, assetFileName)
 
-	res, err := h.productService.CreateProduct(req.Title, req.Description, req.Price, thumbnailURL, assetURL, userID)
+	res, err := h.productService.CreateProduct(req, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -116,7 +123,11 @@ func (h *ProductHandlerImpl) GetProductByID(c *gin.Context) {
 }
 
 func (h *ProductHandlerImpl) UpdateProduct(c *gin.Context) {
-	id, _ := uuid.Parse(c.Param("id"))
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Product ID"})
+		return
+	}
 
 	var req dto.UpdateProductRequest
 	if err := c.ShouldBind(&req); err != nil {
@@ -131,27 +142,43 @@ func (h *ProductHandlerImpl) UpdateProduct(c *gin.Context) {
 	if req.Thumbnail != nil {
 		filename := uuid.New().String() + "-" + filepath.Base(req.Thumbnail.Filename)
 
-		file, err := req.Thumbnail.Open()
-		if err == nil {
-			defer file.Close()
-			_, err = storageClient.UploadFile("assets-storage", filename, file)
-			if err == nil {
-				req.ThumbnailURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, filename)
-			}
+		thumbnailFile, err := req.Thumbnail.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process thumbnail"})
+			return
 		}
+		defer thumbnailFile.Close()
+		_, err = storageClient.UploadFile("assets-storage", filename, thumbnailFile)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload thumbnail to Supabase"})
+			return
+		}
+		req.ThumbnailURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, filename)
 	}
 
 	if req.AssetFile != nil {
 		filename := uuid.New().String() + "-" + filepath.Base(req.AssetFile.Filename)
 
-		file, err := req.AssetFile.Open()
-		if err == nil {
-			defer file.Close()
-			_, err = storageClient.UploadFile("assets-storage", filename, file)
-			if err == nil {
-				req.AssetFileURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, filename)
-			}
+		assetFile, err := req.AssetFile.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process asset file"})
+			return
 		}
+		defer assetFile.Close()
+
+		req.AssetFileSize = req.AssetFile.Size
+		buffer := make([]byte, 512)
+		assetFile.Read(buffer)
+		req.AssetFileType = http.DetectContentType(buffer)
+
+		assetFile.Seek(0, 0)
+
+		_, err = storageClient.UploadFile("assets-storage", filename, assetFile)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload asset to Supabase"})
+			return
+		}
+		req.AssetFileURL = fmt.Sprintf("%s/storage/v1/object/public/assets-storage/%s", supabaseURL, filename)
 	}
 
 	userID := c.MustGet("user_id").(uuid.UUID)

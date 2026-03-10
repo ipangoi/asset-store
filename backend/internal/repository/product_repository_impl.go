@@ -8,23 +8,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type productRepository struct {
+type ProductRepositoryImpl struct {
 	db *gorm.DB
 }
 
 func NewProductRepositoryImpl(db *gorm.DB) ProductRepository {
-	return &productRepository{db}
+	return &ProductRepositoryImpl{db}
 }
 
-// Create implements [ProductRepository].
-func (p *productRepository) Create(product model.Product) (model.Product, error) {
+// Create implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) Create(product model.Product) (model.Product, error) {
 	return product, p.db.Create(&product).Error
 }
 
-// FindAll implements [ProductRepository].
-func (p *productRepository) GetAllProduct(searchQuery string, limit int) ([]model.Product, error) {
+// FindAll implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) GetAllProduct(searchQuery string, limit int) ([]model.Product, error) {
 	var products []model.Product
-	query := p.db.Preload("User")
+	query := p.db.Preload("User").Preload("Category")
 
 	if searchQuery != "" {
 		keyword := "%" + searchQuery + "%"
@@ -38,30 +38,30 @@ func (p *productRepository) GetAllProduct(searchQuery string, limit int) ([]mode
 	return products, query.Find(&products).Error
 }
 
-// FindByID implements [ProductRepository].
-func (p *productRepository) GetProductByID(id uuid.UUID) (model.Product, error) {
+// FindByID implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) GetProductByID(id uuid.UUID) (model.Product, error) {
 	var product model.Product
-	return product, p.db.Preload("User").Where("id = ?", id).First(&product).Error
+	return product, p.db.Preload("User").Preload("Category").Where("id = ?", id).First(&product).Error
 }
 
-// FindByUserID implements [ProductRepository].
-func (p *productRepository) GetProductByUserID(userID uuid.UUID) ([]model.Product, error) {
+// FindByUserID implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) GetProductByUserID(userID uuid.UUID) ([]model.Product, error) {
 	var products []model.Product
 	return products, p.db.Preload("User").Where("user_id = ?", userID).Find(&products).Error
 }
 
-// Delete implements [ProductRepository].
-func (p *productRepository) DeleteProduct(id uuid.UUID) error {
+// Delete implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) DeleteProduct(id uuid.UUID) error {
 	return p.db.Where("id = ?", id).Delete(&model.Product{}).Error
 }
 
-// Update implements [ProductRepository].
-func (p *productRepository) UpdateProduct(product model.Product) (model.Product, error) {
+// Update implements [ProductRepositoryImpl].
+func (p *ProductRepositoryImpl) UpdateProduct(product model.Product) (model.Product, error) {
 	return product, p.db.Save(&product).Error
 }
 
 // Save Product Implementation
-func (p *productRepository) ToggleSaveProduct(userID, productID uuid.UUID) (bool, error) {
+func (p *ProductRepositoryImpl) ToggleSaveProduct(userID, productID uuid.UUID) (bool, error) {
 	var saved model.SavedProduct
 	err := p.db.Where("user_id = ? AND product_id = ?", userID, productID).First(&saved).Error
 
@@ -84,13 +84,13 @@ func (p *productRepository) ToggleSaveProduct(userID, productID uuid.UUID) (bool
 	return false, nil
 }
 
-func (p *productRepository) GetSavedProducts(userID uuid.UUID) ([]model.SavedProduct, error) {
+func (p *ProductRepositoryImpl) GetSavedProducts(userID uuid.UUID) ([]model.SavedProduct, error) {
 	var savedProducts []model.SavedProduct
 	err := p.db.Preload("Product").Preload("Product.User").Where("user_id = ?", userID).Find(&savedProducts).Error
 	return savedProducts, err
 }
 
-func (p *productRepository) GetSavedProductIDs(userID uuid.UUID) ([]string, error) {
+func (p *ProductRepositoryImpl) GetSavedProductIDs(userID uuid.UUID) ([]string, error) {
 	var savedProducts []model.SavedProduct
 	err := p.db.Select("product_id").Where("user_id = ?", userID).Find(&savedProducts).Error
 

@@ -13,4 +13,6 @@ type UserService interface {
 	FindByID(id uuid.UUID) (dto.UserResponse, error)
 	UpdateUser(req dto.UserUpdateProfileRequest, id uuid.UUID) error
 	UpdateRole(id uuid.UUID, req dto.UserUpdateRoleRequest) error
+
+	GetPublicProfile(id uuid.UUID) (dto.UserPublicProfileResponse, error)
 }

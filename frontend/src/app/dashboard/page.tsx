@@ -31,7 +31,7 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        let endpoint = "/product/my-product";
+        let endpoint = "/user/my-product";
         if (activeTab === "library") endpoint = "/user/saved";
         if (activeTab === "purchased") endpoint = "/transaction";
 
