@@ -12,4 +12,6 @@ type UserRepository interface {
 	GetUserByID(id uuid.UUID) (model.User, error)
 	UpdateUser(newName string, id uuid.UUID) error
 	UpdateRole(id uuid.UUID, role string) error
+
+	GetUserProfileWithProducts(id uuid.UUID) (model.User, error)
 }

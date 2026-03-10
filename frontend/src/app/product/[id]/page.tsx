@@ -278,7 +278,7 @@ export default function ProductDetailPage() {
                   <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
                 </div>
                 <span className="text-sm font-black text-black border-2 border-black bg-amber-100 px-2 py-0.5 rounded-md shadow-[2px_2px_0px_0px_#000]">
-                  5.0 (12)
+                  {product.average_rating?.toFixed(1)} ({product.total_reviews})
                 </span>
               </div>
 
@@ -312,15 +312,15 @@ export default function ProductDetailPage() {
               <div className="border-t-4 border-black mt-4 pt-6 flex flex-col gap-4">
                 <div className="flex justify-between items-center font-bold text-black text-sm">
                   <span className="text-gray-600 uppercase tracking-wide">Category</span>
-                  <span className="bg-sky-200 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">Digital</span>
+                  <span className="bg-sky-200 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.category_name}</span>
                 </div>
                 <div className="flex justify-between items-center font-bold text-black text-sm">
-                  <span className="text-gray-600 uppercase tracking-wide">License</span>
-                  <span className="bg-purple-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">Personal</span>
+                  <span className="text-gray-600 uppercase tracking-wide">File Type</span>
+                  <span className="bg-purple-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_type}</span>
                 </div>
                 <div className="flex justify-between items-center font-bold text-black text-sm">
                   <span className="text-gray-600 uppercase tracking-wide">Size</span>
-                  <span className="bg-yellow-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">12 MB</span>
+                  <span className="bg-yellow-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_size} MB</span>
                 </div>
               </div>
 

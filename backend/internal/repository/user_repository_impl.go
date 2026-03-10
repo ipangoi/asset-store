@@ -36,3 +36,10 @@ func (r *UserRepositoryImpl) UpdateUser(newName string, id uuid.UUID) error {
 func (r *UserRepositoryImpl) UpdateRole(id uuid.UUID, role string) error {
 	return r.db.Model(&model.User{}).Where("id = ?", id).Update("role", role).Error
 }
+
+// GetUserProfileWithProducts implements [UserRepository].
+func (r *UserRepositoryImpl) GetUserProfileWithProducts(id uuid.UUID) (model.User, error) {
+	var user model.User
+
+	return user, r.db.Preload("Products.Category").Where("id = ?", id).First(&user).Error
+}

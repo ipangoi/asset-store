@@ -8,4 +8,5 @@ type UserHandler interface {
 	GetProfileByID(c *gin.Context)
 	UpdateProfile(c *gin.Context)
 	UpdateRole(c *gin.Context)
+	GetPublicProfile(c *gin.Context)
 }

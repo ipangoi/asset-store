@@ -97,3 +97,18 @@ func (u *UserHandlerImpl) UpdateRole(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated successfully"})
 }
+
+func (u *UserHandlerImpl) GetPublicProfile(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	res, err := u.userService.GetPublicProfile(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}

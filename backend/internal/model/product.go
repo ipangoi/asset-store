@@ -12,8 +12,17 @@ type Product struct {
 	ThumbnailURL string    `gorm:"type:varchar(255)" json:"thumbnail_url"`
 	AssetFileKey string    `gorm:"type:varchar(255);not null" json:"asset_file_key"`
 
+	CategoryID *uuid.UUID `gorm:"type:uuid" json:"category_id"`
+
 	User         *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Transactions []Transaction `gorm:"foreignKey:ProductID" json:"transactions,omitempty"`
+
+	Category Category `gorm:"foreignKey:CategoryID" json:"category"`
+	Reviews  []Review `gorm:"foreignKey:ProductID" json:"reviews"`
+
+	//new for product metadata
+	AssetFileSize int64  `gorm:"type:bigint" json:"asset_file_size"`
+	AssetFileType string `gorm:"type:varchar(50)" json:"asset_file_type"`
 }
 
 type SavedProduct struct {

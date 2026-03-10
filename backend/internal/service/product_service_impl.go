@@ -13,27 +13,36 @@ import (
 	"github.com/google/uuid"
 )
 
-type productServiceImpl struct {
+type ProductServiceImpl struct {
 	productRepo repository.ProductRepository
 	userRepo    repository.UserRepository
+	reviewRepo  repository.ReviewRepository
 }
 
-func NewProductServiceImpl(productRepo repository.ProductRepository, userRepo repository.UserRepository) ProductService {
-	return &productServiceImpl{productRepo, userRepo}
+func NewProductServiceImpl(productRepo repository.ProductRepository, userRepo repository.UserRepository, reviewRepo repository.ReviewRepository) ProductService {
+	return &ProductServiceImpl{productRepo, userRepo, reviewRepo}
 }
 
-func (s *productServiceImpl) CreateProduct(title, desc string, price int, thumbnailUrl, assetKey string, userID uuid.UUID) (dto.ProductResponse, error) {
+func (s *ProductServiceImpl) CreateProduct(req dto.CreateProductRequest, userID uuid.UUID) (dto.ProductResponse, error) {
 
-	newProduct := model.Product{
-		UserID:       userID,
-		Title:        title,
-		Description:  desc,
-		Price:        price,
-		ThumbnailURL: thumbnailUrl,
-		AssetFileKey: assetKey,
+	parsedCategoryID, err := uuid.Parse(req.CategoryID)
+	if err != nil {
+		return dto.ProductResponse{}, errors.New("Invalid Category ID Format")
 	}
 
-	newProduct, err := s.productRepo.Create(newProduct)
+	newProduct := model.Product{
+		UserID:        userID,
+		Title:         req.Title,
+		Description:   req.Description,
+		Price:         req.Price,
+		ThumbnailURL:  req.ThumbnailURL,
+		AssetFileKey:  req.AssetFileURL,
+		CategoryID:    &parsedCategoryID,
+		AssetFileSize: req.AssetFileSize,
+		AssetFileType: req.AssetFileType,
+	}
+
+	newProduct, err = s.productRepo.Create(newProduct)
 	if err != nil {
 		return dto.ProductResponse{}, err
 	}
@@ -50,6 +59,7 @@ func (s *productServiceImpl) CreateProduct(title, desc string, price int, thumbn
 		Price:        newProduct.Price,
 		ThumbnailURL: newProduct.ThumbnailURL,
 		SellerID:     newProduct.UserID.String(),
+		SellerName:   user.Name,
 	}
 
 	cacheKey := "product:" + newProduct.ID.String()
@@ -58,17 +68,10 @@ func (s *productServiceImpl) CreateProduct(title, desc string, price int, thumbn
 
 	s.clearProductsListCache()
 
-	return dto.ProductResponse{
-		ID:           newProduct.ID.String(),
-		Title:        newProduct.Title,
-		Description:  newProduct.Description,
-		Price:        newProduct.Price,
-		ThumbnailURL: newProduct.ThumbnailURL,
-		SellerID:     newProduct.UserID.String(),
-	}, nil
+	return response, nil
 }
 
-func (s *productServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dto.ProductResponse, error) {
+func (s *ProductServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dto.ProductResponse, error) {
 	cacheKey := fmt.Sprintf("products:search:%s:limit:%d", searchQuery, limit)
 
 	var productResponses []dto.ProductResponse
@@ -85,15 +88,20 @@ func (s *productServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dt
 	}
 
 	for _, product := range products {
+		rating, _ := s.reviewRepo.GetAverageRating(product.ID)
+		totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(product.ID)
 		productResponses = append(productResponses, dto.ProductResponse{
-			ID:           product.ID.String(),
-			Title:        product.Title,
-			Description:  product.Description,
-			Price:        product.Price,
-			ThumbnailURL: product.ThumbnailURL,
-			AssetFileKey: product.AssetFileKey,
-			SellerID:     product.UserID.String(),
-			SellerName:   product.User.Name,
+			ID:            product.ID.String(),
+			Title:         product.Title,
+			Description:   product.Description,
+			Price:         product.Price,
+			ThumbnailURL:  product.ThumbnailURL,
+			AssetFileKey:  product.AssetFileKey,
+			SellerID:      product.UserID.String(),
+			SellerName:    product.User.Name,
+			CategoryName:  product.Category.Name,
+			AverageRating: rating,
+			TotalReviews:  int(totalReviews),
 		})
 	}
 
@@ -103,7 +111,7 @@ func (s *productServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dt
 	return productResponses, nil
 }
 
-func (s *productServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, error) {
+func (s *ProductServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, error) {
 	cacheKey := "product:" + id.String()
 
 	cachedData, err := config.RedisClient.Get(config.Ctx, cacheKey).Result()
@@ -118,15 +126,24 @@ func (s *productServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, 
 		return dto.ProductResponse{}, err
 	}
 
+	rating, _ := s.reviewRepo.GetAverageRating(id)
+	totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(id)
+
 	response := dto.ProductResponse{
-		ID:           product.ID.String(),
-		Title:        product.Title,
-		Description:  product.Description,
-		Price:        product.Price,
-		ThumbnailURL: product.ThumbnailURL,
-		AssetFileKey: product.AssetFileKey,
-		SellerID:     product.UserID.String(),
-		SellerName:   product.User.Name,
+		ID:            product.ID.String(),
+		Title:         product.Title,
+		Description:   product.Description,
+		Price:         product.Price,
+		ThumbnailURL:  product.ThumbnailURL,
+		AssetFileKey:  product.AssetFileKey,
+		SellerID:      product.UserID.String(),
+		SellerName:    product.User.Name,
+		CategoryName:  product.Category.Name,
+		AverageRating: rating,
+		TotalReviews:  int(totalReviews),
+
+		AssetFileSize: product.AssetFileSize,
+		AssetFileType: product.AssetFileType,
 	}
 
 	productJSON, _ := json.Marshal(response)
@@ -135,7 +152,7 @@ func (s *productServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, 
 	return response, nil
 }
 
-func (s *productServiceImpl) GetProductsBySeller(userID uuid.UUID) ([]dto.ProductResponse, error) {
+func (s *ProductServiceImpl) GetProductsBySeller(userID uuid.UUID) ([]dto.ProductResponse, error) {
 	products, err := s.productRepo.GetProductByUserID(userID)
 	if err != nil {
 		return nil, err
@@ -143,22 +160,27 @@ func (s *productServiceImpl) GetProductsBySeller(userID uuid.UUID) ([]dto.Produc
 
 	var responses []dto.ProductResponse
 	for _, product := range products {
+		rating, _ := s.reviewRepo.GetAverageRating(product.ID)
+		totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(product.ID)
 		responses = append(responses, dto.ProductResponse{
-			ID:           product.ID.String(),
-			Title:        product.Title,
-			Description:  product.Description,
-			Price:        product.Price,
-			ThumbnailURL: product.ThumbnailURL,
-			AssetFileKey: product.AssetFileKey,
-			SellerID:     product.UserID.String(),
-			SellerName:   product.User.Name,
+			ID:            product.ID.String(),
+			Title:         product.Title,
+			Description:   product.Description,
+			Price:         product.Price,
+			ThumbnailURL:  product.ThumbnailURL,
+			AssetFileKey:  product.AssetFileKey,
+			SellerID:      product.UserID.String(),
+			SellerName:    product.User.Name,
+			CategoryName:  product.Category.Name,
+			AverageRating: rating,
+			TotalReviews:  int(totalReviews),
 		})
 	}
 
 	return responses, nil
 }
 
-func (s *productServiceImpl) UpdateProduct(id uuid.UUID, req dto.UpdateProductRequest, userID uuid.UUID) (dto.ProductResponse, error) {
+func (s *ProductServiceImpl) UpdateProduct(id uuid.UUID, req dto.UpdateProductRequest, userID uuid.UUID) (dto.ProductResponse, error) {
 	product, err := s.productRepo.GetProductByID(id)
 	if err != nil {
 		return dto.ProductResponse{}, err
@@ -168,14 +190,22 @@ func (s *productServiceImpl) UpdateProduct(id uuid.UUID, req dto.UpdateProductRe
 		return dto.ProductResponse{}, errors.New("Unauthorized: You are not the owner of this product")
 	}
 
+	parsedCategoryID, err := uuid.Parse(req.CategoryID)
+	if err != nil {
+		return dto.ProductResponse{}, errors.New("Invalid Category ID Format")
+	}
+
 	product.Title = req.Title
 	product.Description = req.Description
 	product.Price = req.Price
+	product.CategoryID = &parsedCategoryID
 	if req.ThumbnailURL != "" {
 		product.ThumbnailURL = req.ThumbnailURL
 	}
 	if req.AssetFileURL != "" {
 		product.AssetFileKey = req.AssetFileURL
+		product.AssetFileSize = req.AssetFileSize
+		product.AssetFileType = req.AssetFileType
 	}
 
 	updatedProduct, err := s.productRepo.UpdateProduct(product)
@@ -199,7 +229,7 @@ func (s *productServiceImpl) UpdateProduct(id uuid.UUID, req dto.UpdateProductRe
 	}, nil
 }
 
-func (s *productServiceImpl) DeleteProduct(id uuid.UUID, userID uuid.UUID) error {
+func (s *ProductServiceImpl) DeleteProduct(id uuid.UUID, userID uuid.UUID) error {
 	product, err := s.productRepo.GetProductByID(id)
 	if err != nil {
 		return err
@@ -223,7 +253,7 @@ func (s *productServiceImpl) DeleteProduct(id uuid.UUID, userID uuid.UUID) error
 }
 
 // Save Product Implementation
-func (s *productServiceImpl) ToggleSaveProduct(userID, productID uuid.UUID) (string, error) {
+func (s *ProductServiceImpl) ToggleSaveProduct(userID, productID uuid.UUID) (string, error) {
 	isSaved, err := s.productRepo.ToggleSaveProduct(userID, productID)
 	if err != nil {
 		return "", err
@@ -235,7 +265,7 @@ func (s *productServiceImpl) ToggleSaveProduct(userID, productID uuid.UUID) (str
 	return "Product removed", nil
 }
 
-func (s *productServiceImpl) GetSavedProducts(userID uuid.UUID) ([]dto.ProductResponse, error) {
+func (s *ProductServiceImpl) GetSavedProducts(userID uuid.UUID) ([]dto.ProductResponse, error) {
 	savedItems, err := s.productRepo.GetSavedProducts(userID)
 	if err != nil {
 		return nil, err
@@ -244,15 +274,20 @@ func (s *productServiceImpl) GetSavedProducts(userID uuid.UUID) ([]dto.ProductRe
 	var responses []dto.ProductResponse
 	for _, item := range savedItems {
 		if item.Product != nil {
+			rating, _ := s.reviewRepo.GetAverageRating(item.Product.ID)
+			totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(item.Product.ID)
 			responses = append(responses, dto.ProductResponse{
-				ID:           item.Product.ID.String(),
-				Title:        item.Product.Title,
-				Description:  item.Product.Description,
-				Price:        item.Product.Price,
-				ThumbnailURL: item.Product.ThumbnailURL,
-				AssetFileKey: item.Product.AssetFileKey,
-				SellerID:     item.Product.UserID.String(),
-				SellerName:   item.Product.User.Name,
+				ID:            item.Product.ID.String(),
+				Title:         item.Product.Title,
+				Description:   item.Product.Description,
+				Price:         item.Product.Price,
+				ThumbnailURL:  item.Product.ThumbnailURL,
+				AssetFileKey:  item.Product.AssetFileKey,
+				SellerID:      item.Product.UserID.String(),
+				SellerName:    item.Product.User.Name,
+				CategoryName:  item.Product.Category.Name,
+				AverageRating: rating,
+				TotalReviews:  int(totalReviews),
 			})
 		}
 	}
@@ -260,12 +295,12 @@ func (s *productServiceImpl) GetSavedProducts(userID uuid.UUID) ([]dto.ProductRe
 	return responses, nil
 }
 
-func (s *productServiceImpl) GetSavedProductIDs(userID uuid.UUID) ([]string, error) {
+func (s *ProductServiceImpl) GetSavedProductIDs(userID uuid.UUID) ([]string, error) {
 	return s.productRepo.GetSavedProductIDs(userID)
 }
 
 // redis clear get all search cache
-func (s *productServiceImpl) clearProductsListCache() {
+func (s *ProductServiceImpl) clearProductsListCache() {
 	keys, err := config.RedisClient.Keys(config.Ctx, "products:search:*").Result()
 	if err == nil && len(keys) > 0 {
 		config.RedisClient.Del(config.Ctx, keys...)
