@@ -17,7 +17,7 @@ function LoginContent() {
 
   const redirectUrl = searchParams.get("redirect") || "/";
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
