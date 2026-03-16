@@ -6,6 +6,7 @@ import (
 	"asset-store/internal/middleware"
 	"asset-store/internal/repository"
 	"asset-store/internal/service"
+	"asset-store/internal/websocket"
 	"os"
 	"time"
 
@@ -33,12 +34,17 @@ func StartApp() *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// init websocket
+	hub := websocket.NewHub()
+	go hub.Run()
+
 	//init repo
 	userRepository := repository.NewUserRepositoryImpl(db)
 	productRepo := repository.NewProductRepositoryImpl(db)
 	transactionRepo := repository.NewTransactionRepositoryImpl(db)
 	categoryRepo := repository.NewCategoryRepositoryImpl(db)
 	reviewRepo := repository.NewReviewRepositoryImpl(db)
+	messageRepo := repository.NewMessageRepositoryImpl(db)
 
 	//init service
 	userService := service.NewUserServiceImpl(userRepository, reviewRepo)
@@ -46,6 +52,7 @@ func StartApp() *gin.Engine {
 	transactionService := service.NewTransactionServiceImpl(transactionRepo, userRepository, productRepo)
 	categoryService := service.NewCategoryServiceImpl(categoryRepo)
 	reviewService := service.NewReviewServiceImpl(reviewRepo, productRepo, userRepository)
+	messageService := service.NewMessageServiceImpl(messageRepo, userRepository)
 
 	//init handler
 	userHandler := handler.NewUserHandlerImpl(userService)
@@ -53,18 +60,25 @@ func StartApp() *gin.Engine {
 	productHandler := handler.NewProductHandlerImpl(productService, transactionService)
 	categoryHandler := handler.NewCategoryHandlerImpl(categoryService)
 	reviewHandler := handler.NewReviewHandlerImpl(reviewService)
+	messageHandler := handler.NewMessageHandlerImpl(messageService, hub)
+
+	// rate limiter
+	loginLimiter := middleware.RateLimiter("auth", 5, time.Minute)
+	globalLimiter := middleware.RateLimiter("global", 50, time.Minute)
+
+	r.Use(globalLimiter)
 
 	//user
 	userRouter := r.Group("/user")
 	{
-		userRouter.POST("/register", userHandler.Register)
-		userRouter.POST("/login", userHandler.Login)
+		userRouter.POST("/register", loginLimiter, userHandler.Register)
+		userRouter.POST("/login", loginLimiter, userHandler.Login)
 		userRouter.GET("/:id", userHandler.GetPublicProfile)
 		privateUser := userRouter.Group("")
 		privateUser.Use(middleware.AuthMiddleware())
 		{
 			privateUser.GET("/profile", userHandler.GetProfileByID)
-			privateUser.PUT("/profile", userHandler.UpdateProfile)
+			privateUser.PATCH("/profile", userHandler.UpdateProfile)
 
 			privateUser.PUT("/role", userHandler.UpdateRole)
 
@@ -86,7 +100,7 @@ func StartApp() *gin.Engine {
 		privateProduct.Use(middleware.AuthMiddleware())
 		{
 			privateProduct.POST("", productHandler.CreateProduct)
-			privateProduct.PUT("/:id", productHandler.UpdateProduct)
+			privateProduct.PATCH("/:id", productHandler.UpdateProduct)
 			privateProduct.DELETE("/:id", productHandler.DeleteProduct)
 			privateProduct.POST("/:id/save", productHandler.ToggleSaveProduct)
 			privateProduct.GET("/:id/download", productHandler.DownloadProduct)
@@ -123,6 +137,23 @@ func StartApp() *gin.Engine {
 			privateReview.PUT("/:id", reviewHandler.UpdateReview)
 			privateReview.DELETE("/:id", reviewHandler.DeleteReview)
 		}
+	}
+
+	// chat
+	chatRoutes := r.Group("/chat", middleware.AuthMiddleware())
+	{
+		chatRoutes.GET("", messageHandler.GetListChat)
+		chatRoutes.GET("/:receiver_id", messageHandler.GetChatHistory)
+		chatRoutes.POST("/:receiver_id", messageHandler.SendMessage)
+		chatRoutes.PATCH("/:message_id", messageHandler.UpdateMessage)
+		chatRoutes.DELETE("/:message_id", messageHandler.DeleteMessage)
+		chatRoutes.PATCH("/read/:sender_id", messageHandler.MarkAsRead)
+	}
+
+	// websocket
+	wsRoutes := r.Group("/ws", middleware.AuthMiddleware())
+	{
+		wsRoutes.GET("/chat", messageHandler.ServeWebSocket)
 	}
 
 	return r

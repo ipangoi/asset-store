@@ -63,3 +63,25 @@ export interface CreateReviewRequest {
     rating: number;
     comment: string;
 }
+
+export interface MessageResponse {
+    id: string;
+    sender_id: string;
+    receiver_id: string;
+    content: string;
+    is_read: boolean;
+    created_at: string;
+    sender: UserResponse;
+    receiver: UserResponse;
+}
+
+export interface MessageRequest {
+    content: string;
+}
+
+export interface WSMessage {
+    type: "CHAT" | "READ_RECEIPT";
+    sender_id: string;
+    receiver_id: string;
+    content: string;
+}

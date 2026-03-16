@@ -32,7 +32,15 @@ function LoginContent() {
       router.replace(redirectUrl);
       router.refresh();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed. Please check your credentials.");
+      if (err.response?.status === 404) {
+        setError("Invalid email or password.");
+      } else if (err.response?.status === 500) {
+        setError("Server Error. Please try again later.");
+      } else if (err.response?.status === 429) {
+        setError("Too Many Request. Please try again in 5 minutes.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
