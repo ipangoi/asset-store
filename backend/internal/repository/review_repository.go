@@ -15,4 +15,6 @@ type ReviewRepository interface {
 	GetReviewByID(id uuid.UUID) (model.Review, error)
 	EditReview(review model.Review) (model.Review, error)
 	DeleteReview(id uuid.UUID) error
+
+	GetReviewByUserIDAndProductID(userID uuid.UUID, productID uuid.UUID) (model.Review, error)
 }

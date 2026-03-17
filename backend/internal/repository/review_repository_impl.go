@@ -63,3 +63,9 @@ func (r *ReviewRepositoryImpl) EditReview(review model.Review) (model.Review, er
 func (r *ReviewRepositoryImpl) DeleteReview(id uuid.UUID) error {
 	return r.db.Where("id = ?", id).Delete(&model.Review{}).Error
 }
+
+func (r *ReviewRepositoryImpl) GetReviewByUserIDAndProductID(userID uuid.UUID, productID uuid.UUID) (model.Review, error) {
+	var review model.Review
+
+	return review, r.db.Where("user_id = ? AND product_id = ?", userID, productID).First(&review).Error
+}
