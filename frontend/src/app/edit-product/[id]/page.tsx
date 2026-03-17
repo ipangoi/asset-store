@@ -76,7 +76,7 @@ export default function EditProductPage() {
     }
   };
 
-  const handleUpdateProduct = async (e: React.FormEvent) => {
+  const handleUpdateProduct = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setMessage(null);
@@ -94,7 +94,7 @@ export default function EditProductPage() {
         formData.append("product_file", selectedProductFile);
       }
 
-      await api.put(`/product/${id}`, formData, {
+      await api.patch(`/product/${id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

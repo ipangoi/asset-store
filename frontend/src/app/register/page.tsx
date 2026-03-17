@@ -13,7 +13,7 @@
 //   const [error, setError] = useState("");
 //   const [isLoading, setIsLoading] = useState(false);
 
-//   const handleRegister = async (e: React.FormEvent) => {
+//   const handleRegister = async (e: React.SyntheticEvent) => {
 //     e.preventDefault();
 //     setError("");
 //     setIsLoading(true);
@@ -132,7 +132,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);

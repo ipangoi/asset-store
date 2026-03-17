@@ -54,7 +54,7 @@ export default function SettingPage() {
     }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setErrorMessage("");
@@ -66,7 +66,7 @@ export default function SettingPage() {
     //     formData.append("avatar", selectedFile);
     //   }
 
-      await api.put("/user/profile", formData, {
+      await api.patch("/user/profile", formData, {
         headers: { "Content-Type": "application/json" },
       });
 
