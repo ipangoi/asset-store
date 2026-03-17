@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type ReviewServiceImpl struct {
@@ -27,11 +28,27 @@ func (r *ReviewServiceImpl) CreateReview(req dto.CreateReviewRequest, productID 
 
 	user, err := r.userRepo.GetUserByID(userID)
 	if err != nil {
-		return dto.ReviewResponse{}, err
+		return dto.ReviewResponse{}, errors.New("User not found")
 	}
 
 	if req.Rating < 1 || req.Rating > 5 {
-		return dto.ReviewResponse{}, errors.New("invalid rating")
+		return dto.ReviewResponse{}, errors.New("Invalid rating")
+	}
+
+	product, err := r.productRepo.GetProductByID(productID)
+	if err != nil {
+		return dto.ReviewResponse{}, errors.New("Product not found")
+	}
+
+	if product.UserID == userID {
+		return dto.ReviewResponse{}, errors.New("You cannot review your own product")
+	}
+
+	_, err = r.reviewRepo.GetReviewByUserIDAndProductID(userID, productID)
+	if err == nil {
+		return dto.ReviewResponse{}, errors.New("You already reviewed this product")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return dto.ReviewResponse{}, err
 	}
 
 	newReview.Comment = req.Comment
