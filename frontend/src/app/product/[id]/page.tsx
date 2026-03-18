@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Star, ShoppingCart, Bookmark, AlertTriangle, XCircle, Clock, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Star, ShoppingCart, Bookmark, AlertTriangle, XCircle, Clock, CheckCircle, Loader2, StarHalf } from "lucide-react";
 import Cookies from "js-cookie";
 import api from "@/services/api";
-import { ProductResponse } from "@/types/type";
+import { ProductResponse, ReviewResponse } from "@/types/type";
 
 declare global {
   interface Window {
@@ -19,7 +19,7 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const [product, setProduct] = useState<ProductResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaved, setIsSaved] = useState(false); // State untuk Bookmark
+  const [isSaved, setIsSaved] = useState(false); // bookmark state
 
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState<"idle" | "loading" | "success" | "pending" | "error" | "closed">("idle");
@@ -28,6 +28,45 @@ export default function ProductDetailPage() {
   const [showSimulator, setShowSimulator] = useState(false); // simulator state
 
   const [isZoomed, setIsZoomed] = useState(false);
+
+  // review
+  const [reviews, setReviews] = useState<ReviewResponse[]>([]);
+  // create review
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [isCreatingReview, setIsCreatingReview] = useState(false);
+
+  const handleSubmitReview = async (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (rating === 0) {
+      setReviewError("Please select a rating star!");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setReviewError("");
+
+    try {
+      await api.post(`/product/${id}/reviews`, {
+        rating: rating,
+        comment: comment,
+      });
+
+      // Reset form 
+      setRating(0);
+      setComment("");
+      setIsCreatingReview(false);
+      window.location.reload();
+      
+    } catch (error: any) {
+      setReviewError(error.response?.data?.error || "Failed to submit review.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const handleCheckout = async () => {
     const token = Cookies.get("token");
@@ -103,6 +142,8 @@ export default function ProductDetailPage() {
     const fetchProductData = async () => {
       try {
         const response = await api.get(`/product/${id}`);
+        const review = await api.get(`/product/${id}/reviews`);
+        setReviews(review.data || []);
         setProduct(response.data);
 
         const token = Cookies.get("token");
@@ -124,7 +165,7 @@ export default function ProductDetailPage() {
     if (id) fetchProductData();
   }, [id, router]);
 
-  // Fungsi toggle Bookmark
+  // save product handler
   const handleToggleSave = async () => {
     const token = Cookies.get("token");
     if (!token) {
@@ -251,6 +292,142 @@ export default function ProductDetailPage() {
                 {product.description || "The creator has not provided a description for this asset yet."}
               </div>
             </div>
+
+            <div className="bg-white rounded-4xl border-4 border-black shadow-[8px_8px_0px_0px_#000] p-6 md:p-8">
+              <div className="flex items-center justify-between mb-6 border-b-4 border-black pb-4">
+                <h2 className="text-2xl font-black text-black uppercase tracking-wide inline-block">
+                  Reviews ({product.total_reviews || 0})
+                </h2>
+              </div>
+
+              {/* no review */}
+              {!reviews || reviews.length === 0 ? (
+                <div className="bg-sky-100 border-4 border-black rounded-xl p-6 mb-4 text-center shadow-[4px_4px_0px_0px_#000]">
+                  <p className="font-bold text-black uppercase tracking-wider">
+                    No reviews yet.
+                  </p>
+                </div>
+              ) : (
+                /* List Review */
+                <div className="flex flex-col gap-6 mb-4">
+                  {reviews.map((review: ReviewResponse) => (
+                    <div key={review.id} className="bg-pink-100 border-4 border-black rounded-2xl p-5 shadow-[4px_4px_0px_0px_#000] transition-transform hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000]">
+                      
+                      <div className="flex justify-between items-start mb-3">
+                        {/* name */}
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-amber-400 border-4 border-black rounded-full flex items-center justify-center font-black text-black text-xl shadow-[2px_2px_0px_0px_#000]">
+                            {review.reviewer_name?.charAt(0).toUpperCase() || "A"}
+                          </div>
+                          <div>
+                            <h4 className="font-black text-black uppercase text-md">
+                              {review.reviewer_name || "Anonymous"}
+                            </h4>
+                            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              {new Date(review.created_at).toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* rating */}
+                        <div className="flex bg-white border-2 border-black rounded-full px-2 py-1 shadow-[2px_2px_0px_0px_#000]">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 stroke-[2px] ${
+                                i < review.rating
+                                  ? "fill-amber-400 text-black"
+                                  : "fill-transparent text-gray-400 border-gray-400"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* comment */}
+                      <p className="font-bold text-gray-800 text-sm leading-relaxed whitespace-pre-wrap bg-white border-2 border-black p-4 rounded-xl shadow-[2px_2px_0px_0px_#000] mt-4">
+                        "{review.comment}"
+                      </p>
+                      
+                    </div>
+                  ))}
+                 
+                </div>
+                
+              )}
+              { !isCreatingReview ? (
+                <button onClick={() => setIsCreatingReview(true)} className="bg-emerald-400 items-center text-center text-black font-black uppercase px-6 py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  Create Review
+                </button>
+              ) : (
+                <form onSubmit={handleSubmitReview} className="mb-8 bg-sky-100 border-4 border-black rounded-2xl p-6 shadow-[4px_4px_0px_0px_#000] animate-in fade-in slide-in-from-top-4 duration-300 transition-all">
+                  <h3 className="font-black text-black uppercase mb-3">Write a Review</h3>
+                  
+                  {reviewError && (
+                    <div className="mb-4 bg-red-500 text-white font-bold p-3 border-2 border-black rounded-lg text-sm uppercase">
+                      {reviewError}
+                    </div>
+                  )}
+
+                  {/* add rating with star */}
+                  <div className="flex items-center gap-2 mb-4">
+                    {[...Array(5)].map((_, index) => {
+                      const starValue = index + 1;
+                      return (
+                        <Star
+                          key={index}
+                          className={`h-8 w-8 cursor-pointer stroke-[2px] transition-transform hover:scale-110 active:scale-95 ${
+                            starValue <= (hoverRating || rating)
+                              ? "fill-amber-400 text-black"
+                              : "fill-white text-black"
+                          }`}
+                          onClick={() => setRating(starValue)}
+                          onMouseEnter={() => setHoverRating(starValue)}
+                          onMouseLeave={() => setHoverRating(0)}
+                        />
+                      );
+                    })}
+                    <span className="ml-2 font-bold text-gray-600 uppercase text-sm">
+                      {rating > 0 ? `${rating} Stars` : "Click to rate"}
+                    </span>
+                  </div>
+
+                  {/* comment input */}
+                  <textarea
+                    required
+                    rows={3}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="What do you think about this product?"
+                    className="w-full bg-white border-4 border-black rounded-xl p-4 font-bold text-black focus:outline-none focus:-translate-y-1 focus:shadow-[4px_4px_0px_0px_#000] transition-all resize-none mb-4"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingReview(false)}
+                    className="w-auto bg-red-400 text-black font-black uppercase px-6 py-3 mr-4 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {"CANCEL"}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReview}
+                    className="bg-emerald-400 text-black font-black uppercase px-6 py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingReview ? "SUBMITTING..." : "POST REVIEW"}
+                  </button>
+                </form>
+              )
+              }
+            </div>
+            
+
+
           </div>
 
           {/* right column */}
@@ -262,20 +439,35 @@ export default function ProductDetailPage() {
                   {product.title}
                 </h1>
                 <p className="text-base font-bold text-gray-500 uppercase">
-                  BY <span className="underline decoration-4 underline-offset-4 decoration-pink-400 text-black">
+                  BY {" "}
+                  <Link href={`/profile/${product.seller_id}`} className="decoration-none hover:underline hover:decoration-4 hover:underline-offset-4 hover:decoration-pink-500 hover:text-pink-500 text-black transition-all duration-300">
                     {product.seller_name ? product.seller_name : "Unknown"} 
-                  </span>
+                  </Link>
                 </p>
               </div>
 
-              {/* rating (not yet implemented) */}
+              {/* rating */}
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex items-center gap-1">
-                  <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
-                  <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
-                  <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
-                  <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
-                  <Star className="h-5 w-5 fill-amber-400 text-black stroke-[2px]" />
+                  {[...Array(5)].map((_, i) => {
+                    const rating = product.average_rating || 0;
+                    const fullStars = Math.floor(rating);
+                    const hasHalfStar = rating - fullStars >= 0.5;
+
+                    if (i < fullStars) {
+                      return <Star key={i} className="h-4 w-4 fill-amber-400 text-black stroke-[2px]" />;
+                    } else if (i === fullStars && hasHalfStar) {
+                      return (
+                        <div key={i} className="relative w-4 h-4">
+                          <StarHalf className="h-4 w-4 fill-amber-400 text-black stroke-[2px] absolute z-1 top-0 left-0" />
+                          <Star className="h-4 w-4 fill-none text-black stroke-[2px] absolute top-0 left-0" />
+                        </div>
+
+                      );
+                    } else {
+                      return <Star key={i} className="h-4 w-4 fill-transparent text-black stroke-[2px]" />;
+                    }
+                  })}
                 </div>
                 <span className="text-sm font-black text-black border-2 border-black bg-amber-100 px-2 py-0.5 rounded-md shadow-[2px_2px_0px_0px_#000]">
                   {product.average_rating?.toFixed(1)} ({product.total_reviews})
@@ -308,7 +500,7 @@ export default function ProductDetailPage() {
                 </button>
               </div>
 
-              {/* product metadata (not yet implemented) */}
+              {/* product metadata */}
               <div className="border-t-4 border-black mt-4 pt-6 flex flex-col gap-4">
                 <div className="flex justify-between items-center font-bold text-black text-sm">
                   <span className="text-gray-600 uppercase tracking-wide">Category</span>
@@ -316,11 +508,11 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex justify-between items-center font-bold text-black text-sm">
                   <span className="text-gray-600 uppercase tracking-wide">File Type</span>
-                  <span className="bg-purple-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_type}</span>
+                  <span className="bg-purple-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_type ? product.asset_file_type.toString().split('/').at(-1)?.toUpperCase() : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center font-bold text-black text-sm">
                   <span className="text-gray-600 uppercase tracking-wide">Size</span>
-                  <span className="bg-yellow-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_size} MB</span>
+                  <span className="bg-yellow-300 border-2 border-black px-3 py-1 rounded-full shadow-[2px_2px_0px_0px_#000]">{product.asset_file_size ? (product.asset_file_size / (1024 * 1024)).toFixed(2) : '0'} MB</span>
                 </div>
               </div>
 

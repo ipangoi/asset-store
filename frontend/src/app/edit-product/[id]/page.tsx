@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Save, Upload, Image as ImageIcon, FileArchive, DollarSign, Type, AlignLeft } from "lucide-react";
 import Cookies from "js-cookie";
 import api from "@/services/api";
+import { CategoryResponse } from "@/types/type";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -27,6 +28,12 @@ export default function EditProductPage() {
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
 
+  // category
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const token = Cookies.get("token");
     if (!token) {
@@ -38,7 +45,7 @@ export default function EditProductPage() {
       try {
         const response = await api.get(`/product/${id}`);
         const product = response.data;
-        
+        setCategoryId(product.category_id || "");
         setTitle(product.title || "");
         setDescription(product.description || "");
         setPrice(product.price || 0);
@@ -76,7 +83,7 @@ export default function EditProductPage() {
     }
   };
 
-  const handleUpdateProduct = async (e: React.SyntheticEvent) => {
+  const handleUpdateProduct = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     setMessage(null);
@@ -86,6 +93,7 @@ export default function EditProductPage() {
       formData.append("title", title);
       formData.append("description", description);
       formData.append("price", price.toString());
+      formData.append("category_id", categoryId);
 
       if (selectedThumbnail) {
         formData.append("thumbnail", selectedThumbnail);
@@ -114,6 +122,28 @@ export default function EditProductPage() {
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get("/category"); 
+        setCategories(response.data); 
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (isLoading) {
     return (
@@ -224,6 +254,57 @@ export default function EditProductPage() {
                 required
                 className="w-full bg-white border-4 border-black rounded-xl px-5 py-4 font-bold text-black focus:outline-none focus:translate-y-1 focus:shadow-none shadow-[4px_4px_0px_0px_#000] transition-all resize-none"
               />
+            </div>
+
+            <div className="md:col-span-2" ref={dropdownRef}>
+              <label className="block text-sm font-black text-black uppercase mb-2">
+                Category
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="w-full bg-white border-4 border-black rounded-xl px-4 py-3 font-bold text-black flex justify-between items-center focus:outline-none focus:translate-y-1 focus:shadow-none shadow-[4px_4px_0px_0px_#000] transition-all cursor-pointer"
+                >
+                  <span>
+                    {categoryId
+                      ? categories.find((c) => c.id === categoryId)?.category_name
+                      : "Select a category..."}
+                  </span>
+                  <span
+                    className={`transform transition-transform duration-200 font-black ${
+                      isDropdownOpen ? "" : "-rotate-90"
+                    }`}
+                  >
+                    ▼
+                  </span>
+                </button>
+
+                {isDropdownOpen && (
+                  <ul className="absolute z-20 w-full mt-2 bg-white border-4 border-black rounded-xl shadow-[8px_8px_0px_0px_#000] max-h-60 overflow-y-auto overflow-x-hidden">
+                    {categories.length === 0 ? (
+                      <li className="px-4 py-3 font-bold text-gray-400 italic">
+                        Loading categories...
+                      </li>
+                    ) : (
+                      categories.map((category) => (
+                        <li
+                          key={category.id}
+                          onClick={() => {
+                            setCategoryId(category.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`px-4 py-3 font-black text-black cursor-pointer transition-all border-b-4 border-black last:border-b-0 hover:bg-sky-300 hover:pl-6 ${
+                            categoryId === category.id ? "bg-amber-400" : ""
+                          }`}
+                        >
+                          {category.category_name}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* asset/file upload */}

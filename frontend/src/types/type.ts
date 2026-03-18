@@ -17,6 +17,7 @@ export interface ProductResponse {
     category_name?: string; 
     average_rating?: number;
     total_reviews?: number;
+    reviews?: ReviewResponse[];
     asset_file_size?: number;
     asset_file_type?: string;
 }
@@ -48,7 +49,7 @@ export interface UserPublicProfileResponse {
 
 export interface CategoryResponse {
     id: string;
-    name: string;
+    category_name: string;
 }
 
 export interface ReviewResponse {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, UploadCloud } from "lucide-react";
 import api from "@/services/api";
+import { CategoryResponse } from "@/types/type";
 
 export default function StartSellingPage() {
   const router = useRouter();
@@ -16,7 +17,12 @@ export default function StartSellingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.SyntheticEvent) => {
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -32,6 +38,7 @@ export default function StartSellingPage() {
       formData.append("title", title);
       formData.append("description", description);
       formData.append("price", price);
+      formData.append("category_id", categoryId);
       formData.append("thumbnail", thumbnail);
       formData.append("asset_file", assetFile);
 
@@ -49,6 +56,28 @@ export default function StartSellingPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get("/category"); 
+        setCategories(response.data); 
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="min-h-screen bg-amber-100 p-4 md:p-8 font-sans">
@@ -122,6 +151,57 @@ export default function StartSellingPage() {
                     className="w-full bg-white border-4 border-black rounded-xl pl-12 pr-4 py-3 font-bold text-black focus:outline-none focus:-translate-y-1 focus:shadow-[4px_4px_0px_0px_#000] transition-all"
                     placeholder="50000"
                   />
+                </div>
+              </div>
+
+              <div className="md:col-span-2" ref={dropdownRef}>
+                <label className="block text-sm font-black text-black uppercase mb-2">
+                  Category
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="w-full bg-white border-4 border-black rounded-xl px-4 py-3 font-bold text-black flex justify-between items-center focus:outline-none focus:-translate-y-1 focus:shadow-[4px_4px_0px_0px_#000] transition-all cursor-pointer"
+                  >
+                    <span>
+                      {categoryId
+                        ? categories.find((c) => c.id === categoryId)?.category_name
+                        : "Select a category..."}
+                    </span>
+                    <span
+                      className={`transform transition-transform duration-200 font-black ${
+                        isDropdownOpen ? "" : "-rotate-90"
+                      }`}
+                    >
+                      ▼
+                    </span>
+                  </button>
+
+                  {isDropdownOpen && (
+                    <ul className="absolute z-20 w-full mt-2 bg-white border-4 border-black rounded-xl shadow-[8px_8px_0px_0px_#000] max-h-60 overflow-y-auto overflow-x-hidden">
+                      {categories.length === 0 ? (
+                        <li className="px-4 py-3 font-bold text-gray-400 italic">
+                          Loading categories...
+                        </li>
+                      ) : (
+                        categories.map((category) => (
+                          <li
+                            key={category.id}
+                            onClick={() => {
+                              setCategoryId(category.id);
+                              setIsDropdownOpen(false);
+                            }}
+                            className={`px-4 py-3 font-black text-black cursor-pointer transition-all border-b-4 border-black last:border-b-0 hover:bg-sky-300 hover:pl-6 ${
+                              categoryId === category.id ? "bg-amber-400" : ""
+                            }`}
+                          >
+                            {category.category_name}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
                 </div>
               </div>
 
