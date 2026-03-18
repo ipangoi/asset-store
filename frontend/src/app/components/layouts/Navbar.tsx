@@ -55,7 +55,7 @@ function NavbarContent() {
   };
 
   // handle search bar
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
