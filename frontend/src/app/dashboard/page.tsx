@@ -71,9 +71,7 @@ export default function DashboardPage() {
       } catch (error) {
         console.log("Failed to fetch data", error);
         setProfile("");
-      } finally {
-        setIsLoading(false);
-      }
+      } 
     }
     fetchProfileData();
     

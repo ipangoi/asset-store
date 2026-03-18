@@ -62,8 +62,8 @@ export default function ProductCard({ id, title, creator, price, imageUrl, isIni
             <Bookmark
               className={`h-5 w-5 stroke-[3px] transition-colors ${
                 isSaved
-                  ? "fill-pink-500 text-pink-500" // Warna Pink saat di-save
-                  : "fill-transparent text-black" // Transparan saat belum di-save
+                  ? "fill-pink-500 text-pink-500"
+                  : "fill-transparent text-black" 
               }`}
             />
           </button>
@@ -83,7 +83,7 @@ export default function ProductCard({ id, title, creator, price, imageUrl, isIni
 
         <div className="flex flex-col grow p-5 sm:p-6">
           <h3 className="line-clamp-2 text-xl font-black text-black uppercase leading-tight group-hover:underline">{title}</h3>
-          <p className="mt-2 text-sm font-bold text-gray-500 grow">BY {creator}</p>
+          <p className="mt-2 text-sm font-bold text-gray-500 grow">By {creator}</p>
           
           
           {/* <div className="mt-4 flex items-center justify-between">
