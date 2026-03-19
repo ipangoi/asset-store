@@ -32,7 +32,7 @@ func ConnectDB() *gorm.DB {
 	log.Println("Database connection success")
 
 	// Jalankan Auto-Migrate (Otomatis bikin tabel kalau belum ada)
-	err = db.AutoMigrate(&model.User{}, &model.Product{}, &model.Transaction{}, &model.SavedProduct{}, &model.Category{}, &model.Review{})
+	err = db.AutoMigrate(&model.User{}, &model.Product{}, &model.Transaction{}, &model.SavedProduct{}, &model.Category{}, &model.Review{}, &model.Message{})
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}

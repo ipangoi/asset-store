@@ -20,7 +20,7 @@ func NewReviewHandlerImpl(reviewService service.ReviewService) ReviewHandler {
 // CreateReview implements [ReviewHandler].
 func (r *ReviewHandlerImpl) CreateReview(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	productID, err := uuid.Parse(c.Param("product_id"))
+	productID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
@@ -43,7 +43,7 @@ func (r *ReviewHandlerImpl) CreateReview(c *gin.Context) {
 
 // GetAllReviewByProduct implements [ReviewHandler].
 func (r *ReviewHandlerImpl) GetAllReviewByProduct(c *gin.Context) {
-	productID, err := uuid.Parse(c.Param("product_id"))
+	productID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
