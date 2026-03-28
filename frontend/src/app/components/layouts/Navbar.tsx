@@ -101,7 +101,7 @@ function NavbarContent() {
         </div>
 
         <div className="hidden items-center space-x-4 font-black md:flex">
-          <Link href="/sell-product" className="rounded-full bg-pink-500 px-6 py-2.5 text-white border-4 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase text-sm tracking-wider">
+          <Link href={isLoggedIn ? "/sell-product" : "/login?redirect=/sell-product"} className="rounded-full bg-pink-500 px-6 py-2.5 text-white border-4 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase text-sm tracking-wider">
             Start Selling
           </Link>
 
@@ -175,10 +175,10 @@ function NavbarContent() {
         <div className="flex flex-col px-4 py-6 gap-4">
 
           <Link 
-            href="/sell-product" 
+            href={isLoggedIn ? "/sell-product" : "/login?redirect=/sell-product"}
             onClick={() => setIsOpen(false)}
             className="rounded-2xl bg-pink-500 py-3 text-center font-black text-white border-4 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase"
-          >
+            >
             START SELLING
           </Link>
 

@@ -62,7 +62,21 @@ export default function ProductDetailPage() {
       window.location.reload();
       
     } catch (error: any) {
-      setReviewError(error.response?.data?.error || "Failed to submit review.");
+      let errorMessage = "Failed to submit review. Please try again.";
+      
+      if (error.response?.status === 401) {
+        errorMessage = "Please log in to submit a review.";
+      } else if (error.response?.status === 403) {
+        errorMessage = "You don't have permission to submit a review.";
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid review data. Please check your input.";
+      } else if (error.response?.status === 429) {
+        errorMessage = "Too many requests. Please try again later.";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      setReviewError(errorMessage);
     } finally {
       setIsSubmittingReview(false);
     }
