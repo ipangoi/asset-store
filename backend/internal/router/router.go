@@ -51,7 +51,7 @@ func StartApp() *gin.Engine {
 	productService := service.NewProductServiceImpl(productRepo, userRepository, reviewRepo)
 	transactionService := service.NewTransactionServiceImpl(transactionRepo, userRepository, productRepo)
 	categoryService := service.NewCategoryServiceImpl(categoryRepo)
-	reviewService := service.NewReviewServiceImpl(reviewRepo, productRepo, userRepository)
+	reviewService := service.NewReviewServiceImpl(reviewRepo, productRepo, userRepository, transactionRepo)
 	messageService := service.NewMessageServiceImpl(messageRepo, userRepository)
 
 	//init handler
@@ -73,6 +73,8 @@ func StartApp() *gin.Engine {
 	{
 		userRouter.POST("/register", loginLimiter, userHandler.Register)
 		userRouter.POST("/login", loginLimiter, userHandler.Login)
+		userRouter.POST("/refresh", userHandler.RefreshToken)
+		userRouter.POST("/logout", userHandler.Logout)
 		userRouter.GET("/:id", userHandler.GetPublicProfile)
 		privateUser := userRouter.Group("")
 		privateUser.Use(middleware.AuthMiddleware())
@@ -119,6 +121,8 @@ func StartApp() *gin.Engine {
 		{
 			privateTransaction.POST("", transactionHandler.CreateTransaction)
 			privateTransaction.GET("", transactionHandler.GetUserTransactions)
+			privateTransaction.GET("/analytics", transactionHandler.GetSellerAnalytics)
+			privateTransaction.POST("/verify", transactionHandler.VerifyTransaction)
 		}
 	}
 
@@ -143,6 +147,7 @@ func StartApp() *gin.Engine {
 	chatRoutes := r.Group("/chat", middleware.AuthMiddleware())
 	{
 		chatRoutes.GET("", messageHandler.GetListChat)
+		chatRoutes.GET("/unread-count", messageHandler.GetUnreadCount)
 		chatRoutes.GET("/:receiver_id", messageHandler.GetChatHistory)
 		chatRoutes.POST("/:receiver_id", messageHandler.SendMessage)
 		chatRoutes.PATCH("/:message_id", messageHandler.UpdateMessage)

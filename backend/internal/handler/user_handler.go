@@ -9,4 +9,6 @@ type UserHandler interface {
 	UpdateProfile(c *gin.Context)
 	UpdateRole(c *gin.Context)
 	GetPublicProfile(c *gin.Context)
+	RefreshToken(c *gin.Context)
+	Logout(c *gin.Context)
 }

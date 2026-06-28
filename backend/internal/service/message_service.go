@@ -8,9 +8,10 @@ import (
 
 type MessageService interface {
 	SendMessage(req dto.MessageRequest, senderID uuid.UUID, receiverID uuid.UUID) (dto.MessageResponse, error)
-	GetChatHistory(senderID uuid.UUID, receiverID uuid.UUID) ([]dto.MessageResponse, error)
+	GetChatHistory(senderID uuid.UUID, receiverID uuid.UUID, limit, offset int) ([]dto.MessageResponse, error)
 	GetListChat(id uuid.UUID) ([]dto.MessageResponse, error)
 	UpdateMessage(req dto.MessageRequest, messageID uuid.UUID, userID uuid.UUID) (dto.MessageResponse, error)
 	DeleteMessage(messageID uuid.UUID, userID uuid.UUID) error
 	MarkAsRead(senderID uuid.UUID, receiverID uuid.UUID) error
+	GetUnreadCount(userID uuid.UUID) (int64, error)
 }

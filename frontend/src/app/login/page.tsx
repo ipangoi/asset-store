@@ -25,9 +25,10 @@ function LoginContent() {
     try {
       const response = await api.post("/user/login", { email, password });
       
-      const { token } = response.data;
+      const { token, refresh_token } = response.data;
 
       Cookies.set("token", token, { expires: 1 });
+      if (refresh_token) Cookies.set("refresh_token", refresh_token, { expires: 7 });
 
       router.replace(redirectUrl);
       router.refresh();
@@ -115,12 +116,14 @@ function LoginContent() {
             </button>
           </form>
 
-          <p className="mt-8 text-center text-black font-bold text-sm">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-amber-500 font-black hover:underline decoration-4 underline-offset-4">
-              Sign up here
-            </Link>
-          </p>
+          <div className="mt-8 flex flex-col gap-3 text-center">
+            <p className="text-black font-bold text-sm">
+              Don't have an account?{" "}
+              <Link href="/register" className="text-amber-500 font-black hover:underline decoration-4 underline-offset-4">
+                Sign up here
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

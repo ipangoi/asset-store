@@ -25,11 +25,14 @@ export interface ProductResponse {
 export interface TransactionResponse {
     id: string;
     order_id: string;
+    product_id: string;
     amount: number;
     status: string;
     snap_token: string;
     snap_redirect_url: string;
     is_free: boolean;
+    created_at: string;
+    product: ProductResponse;
 }
 
 export interface CreateProductRequest {
@@ -80,9 +83,19 @@ export interface MessageRequest {
     content: string;
 }
 
-export interface WSMessage {
-    type: "CHAT" | "READ_RECEIPT";
-    sender_id: string;
-    receiver_id: string;
-    content: string;
-}
+export type WSMessage = 
+  | { 
+      type: "CHAT"; 
+      sender_id: string; 
+      receiver_id: string; 
+      content: string 
+    }
+  | { 
+      type: "READ_RECEIPT"; 
+      sender_id: string; 
+      receiver_id: string 
+    }
+  | { 
+      type: "USER_ONLINE" | "USER_OFFLINE"; 
+      sender_id: string 
+};

@@ -15,4 +15,7 @@ type UserService interface {
 	UpdateRole(id uuid.UUID, req dto.UserUpdateRoleRequest) error
 
 	GetPublicProfile(id uuid.UUID) (dto.UserPublicProfileResponse, error)
+
+	RefreshToken(refreshToken string) (dto.UserResponse, error)
+	Logout(refreshToken string) error
 }

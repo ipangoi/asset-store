@@ -37,7 +37,7 @@ func (h *TransactionHandlerImpl) CreateTransaction(c *gin.Context) {
 }
 
 func (h *TransactionHandlerImpl) MidtransWebhook(c *gin.Context) {
-	var notificationPayload map[string]interface{}
+	var notificationPayload map[string]any
 
 	// Midtrans mengirim data dalam bentuk JSON
 	if err := c.ShouldBindJSON(&notificationPayload); err != nil {
@@ -47,6 +47,10 @@ func (h *TransactionHandlerImpl) MidtransWebhook(c *gin.Context) {
 
 	err := h.transactionService.MidtransWebhook(notificationPayload)
 	if err != nil {
+		if err.Error() == "invalid webhook signature" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -59,6 +63,36 @@ func (h *TransactionHandlerImpl) GetUserTransactions(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
 	res, err := h.transactionService.GetTransactionByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *TransactionHandlerImpl) VerifyTransaction(c *gin.Context) {
+	var body struct {
+		OrderID string `json:"order_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := h.transactionService.VerifyAndUpdateTransaction(body.OrderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *TransactionHandlerImpl) GetSellerAnalytics(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	res, err := h.transactionService.GetSellerAnalytics(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

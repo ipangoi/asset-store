@@ -4,12 +4,16 @@ import (
 	"asset-store/internal/dto"
 	"asset-store/internal/model"
 	"asset-store/internal/repository"
+	"crypto/sha512"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/midtrans/midtrans-go"
+	"github.com/midtrans/midtrans-go/coreapi"
 	"github.com/midtrans/midtrans-go/snap"
 )
 
@@ -175,10 +179,12 @@ func (s *TransactionServiceImpl) GetTransactionByUserID(userID uuid.UUID) ([]dto
 	for _, t := range transaction {
 		responses = append(responses, dto.TransactionResponse{
 			ID:              t.ID.String(),
+			OrderID:         t.OrderID,
 			ProductID:       t.ProductID.String(),
 			Amount:          t.Amount,
 			Status:          t.Status,
 			SnapRedirectURL: t.SnapRedirectURL,
+			CreatedAt:       t.CreatedAt.Format(time.RFC3339),
 			Product: dto.ProductResponse{
 				ID:           t.Product.ID.String(),
 				Title:        t.Product.Title,
@@ -219,9 +225,22 @@ func (s *TransactionServiceImpl) GetTransactionByProductID(productID uuid.UUID) 
 	return responses, nil
 }
 
-func (s *TransactionServiceImpl) MidtransWebhook(notificationPayload map[string]interface{}) error {
+func (s *TransactionServiceImpl) MidtransWebhook(notificationPayload map[string]any) error {
 	orderID, _ := notificationPayload["order_id"].(string)
+	statusCode, _ := notificationPayload["status_code"].(string)
+	grossAmount, _ := notificationPayload["gross_amount"].(string)
+	receivedSig, _ := notificationPayload["signature_key"].(string)
 	status, _ := notificationPayload["transaction_status"].(string)
+
+	// Verify signature: SHA512(order_id + status_code + gross_amount + ServerKey)
+	serverKey := os.Getenv("MIDTRANS_SERVER_KEY")
+	raw := orderID + statusCode + grossAmount + serverKey
+	hash := sha512.Sum512([]byte(raw))
+	expectedSig := fmt.Sprintf("%x", hash)
+
+	if !strings.EqualFold(receivedSig, expectedSig) {
+		return errors.New("invalid webhook signature")
+	}
 
 	finalStatus := "pending"
 	switch status {
@@ -232,6 +251,64 @@ func (s *TransactionServiceImpl) MidtransWebhook(notificationPayload map[string]
 	}
 
 	return s.transactionRepo.UpdateStatus(orderID, finalStatus)
+}
+
+func (s *TransactionServiceImpl) GetSellerAnalytics(sellerID uuid.UUID) (dto.SellerAnalyticsResponse, error) {
+	totalSales, totalRevenue, err := s.transactionRepo.GetSellerAnalytics(sellerID)
+	if err != nil {
+		return dto.SellerAnalyticsResponse{}, err
+	}
+
+	products, err := s.productRepo.GetProductByUserID(sellerID)
+	if err != nil {
+		return dto.SellerAnalyticsResponse{}, err
+	}
+
+	return dto.SellerAnalyticsResponse{
+		TotalProducts: len(products),
+		TotalSales:    totalSales,
+		TotalRevenue:  totalRevenue,
+	}, nil
+}
+
+func (s *TransactionServiceImpl) VerifyAndUpdateTransaction(orderID string) (dto.TransactionResponse, error) {
+	// Server-side check: ask Midtrans for the real status
+	mtResponse, mtErr := coreapi.CheckTransaction(orderID)
+	if mtErr != nil {
+		return dto.TransactionResponse{}, errors.New("failed to verify payment with Midtrans: " + mtErr.Message)
+	}
+
+	finalStatus := "pending"
+	switch mtResponse.TransactionStatus {
+	case "settlement", "capture":
+		finalStatus = "settlement"
+	case "expire", "cancel", "deny":
+		finalStatus = "failed"
+	}
+
+	if dbErr := s.transactionRepo.UpdateStatus(orderID, finalStatus); dbErr != nil {
+		return dto.TransactionResponse{}, dbErr
+	}
+
+	transaction, dbErr := s.transactionRepo.FindByOrderID(orderID)
+	if dbErr != nil {
+		return dto.TransactionResponse{}, dbErr
+	}
+
+	return dto.TransactionResponse{
+		ID:        transaction.ID.String(),
+		OrderID:   transaction.OrderID,
+		ProductID: transaction.ProductID.String(),
+		Amount:    transaction.Amount,
+		Status:    transaction.Status,
+		CreatedAt: transaction.CreatedAt.Format(time.RFC3339),
+		Product: dto.ProductResponse{
+			ID:           transaction.Product.ID.String(),
+			Title:        transaction.Product.Title,
+			ThumbnailURL: transaction.Product.ThumbnailURL,
+			Price:        transaction.Product.Price,
+		},
+	}, nil
 }
 
 func (s *TransactionServiceImpl) VerifyPurchase(userID uuid.UUID, productID uuid.UUID) bool {

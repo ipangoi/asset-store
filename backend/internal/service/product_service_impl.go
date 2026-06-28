@@ -111,6 +111,34 @@ func (s *ProductServiceImpl) GetAllProducts(searchQuery string, limit int) ([]dt
 	return productResponses, nil
 }
 
+func (s *ProductServiceImpl) GetAllProductsWithFilters(searchQuery, categoryID, sortBy string, minPrice, maxPrice, limit int) ([]dto.ProductResponse, error) {
+	products, err := s.productRepo.GetAllProductWithFilters(searchQuery, categoryID, sortBy, minPrice, maxPrice, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	var productResponses []dto.ProductResponse
+	for _, product := range products {
+		rating, _ := s.reviewRepo.GetAverageRating(product.ID)
+		totalReviews, _ := s.reviewRepo.CountTotalReviewsByProductID(product.ID)
+		productResponses = append(productResponses, dto.ProductResponse{
+			ID:            product.ID.String(),
+			Title:         product.Title,
+			Description:   product.Description,
+			Price:         product.Price,
+			ThumbnailURL:  product.ThumbnailURL,
+			AssetFileKey:  product.AssetFileKey,
+			SellerID:      product.UserID.String(),
+			SellerName:    product.User.Name,
+			CategoryName:  product.Category.Name,
+			AverageRating: rating,
+			TotalReviews:  int(totalReviews),
+		})
+	}
+
+	return productResponses, nil
+}
+
 func (s *ProductServiceImpl) GetProductByID(id uuid.UUID) (dto.ProductResponse, error) {
 	cacheKey := "product:" + id.String()
 

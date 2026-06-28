@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Star, ShoppingCart, Bookmark, AlertTriangle, XCircle, Clock, CheckCircle, Loader2, StarHalf } from "lucide-react";
+import { ArrowLeft, Star, ShoppingCart, Bookmark, AlertTriangle, XCircle, Clock, CheckCircle, Loader2, StarHalf, MessageSquareText } from "lucide-react";
 import Cookies from "js-cookie";
 import api from "@/services/api";
 import { ProductResponse, ReviewResponse } from "@/types/type";
@@ -21,6 +21,7 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false); // bookmark state
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState<"idle" | "loading" | "success" | "pending" | "error" | "closed">("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -98,9 +99,14 @@ export default function ProductDetailPage() {
       setShowSimulator(true);
 
       window.snap.pay(snapToken, {
-        onSuccess: function (result: any) {
-          setCheckoutStatus("success");
+        onSuccess: async function (result: any) {
           setShowSimulator(false);
+          try {
+            await api.post("/transaction/verify", { order_id: result.order_id });
+          } catch {
+            // best-effort; webhook handles it if this fails
+          }
+          setCheckoutStatus("success");
           setTimeout(() => {
             router.push("/dashboard");
           }, 2000);
@@ -148,11 +154,15 @@ export default function ProductDetailPage() {
 
         const token = Cookies.get("token");
         if (token) {
-          const savedRes = await api.get("/user/saved-ids");
+          const [savedRes, profileRes] = await Promise.all([
+            api.get("/user/saved-ids"),
+            api.get("/user/profile"),
+          ]);
           const savedIds = savedRes.data.saved_ids || [];
           if (savedIds.includes(id as string)) {
-            setIsSaved(true); 
+            setIsSaved(true);
           }
+          setCurrentUserId(profileRes.data.id);
         }
       } catch (error) {
         console.log("Failed to fetch product:", error);
@@ -487,6 +497,22 @@ export default function ProductDetailPage() {
                   </span>
                   <ShoppingCart className="h-6 w-6 text-white stroke-[3px]" />
                 </button>
+
+                {currentUserId !== product.seller_id && (
+                  <button
+                    onClick={() => {
+                      const token = Cookies.get("token");
+                      if (!token) {
+                        router.push(`/login?redirect=/product/${id}`);
+                        return;
+                      }
+                      router.push(`/chat?userId=${product.seller_id}&name=${encodeURIComponent(product.seller_name || "Seller")}`);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-sky-400 px-6 py-4 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all cursor-pointer font-black text-black uppercase tracking-wider"
+                  >
+                    <MessageSquareText className="h-6 w-6 stroke-[3px]" />
+                  </button>
+                )}
 
                 <button 
                   onClick={handleToggleSave}

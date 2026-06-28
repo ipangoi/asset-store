@@ -55,3 +55,18 @@ func (t *transactionRepositoryImpl) VerifyPurchase(userID uuid.UUID, productID u
 
 	return count > 0, err
 }
+
+func (t *transactionRepositoryImpl) GetSellerAnalytics(sellerID uuid.UUID) (int64, int64, error) {
+	type result struct {
+		TotalSales   int64
+		TotalRevenue int64
+	}
+	var r result
+	err := t.db.Raw(`
+		SELECT COUNT(t.id) AS total_sales, COALESCE(SUM(t.amount), 0) AS total_revenue
+		FROM transactions t
+		JOIN products p ON t.product_id = p.id
+		WHERE p.user_id = ? AND t.status = 'settlement'
+	`, sellerID).Scan(&r).Error
+	return r.TotalSales, r.TotalRevenue, err
+}

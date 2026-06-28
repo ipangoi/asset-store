@@ -38,6 +38,46 @@ func (p *ProductRepositoryImpl) GetAllProduct(searchQuery string, limit int) ([]
 	return products, query.Find(&products).Error
 }
 
+// GetAllProductWithFilters implements [ProductRepository] with category, price, and sort filters.
+func (p *ProductRepositoryImpl) GetAllProductWithFilters(searchQuery, categoryID, sortBy string, minPrice, maxPrice, limit int) ([]model.Product, error) {
+	var products []model.Product
+	query := p.db.Preload("User").Preload("Category")
+
+	if searchQuery != "" {
+		keyword := "%" + searchQuery + "%"
+		query = query.Where("title ILIKE ? OR description ILIKE ?", keyword, keyword)
+	}
+
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
+	}
+
+	if minPrice > 0 {
+		query = query.Where("price >= ?", minPrice)
+	}
+
+	if maxPrice > 0 {
+		query = query.Where("price <= ?", maxPrice)
+	}
+
+	switch sortBy {
+	case "price_asc":
+		query = query.Order("price ASC")
+	case "price_desc":
+		query = query.Order("price DESC")
+	case "newest":
+		query = query.Order("created_at DESC")
+	default:
+		query = query.Order("created_at DESC")
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	return products, query.Find(&products).Error
+}
+
 // FindByID implements [ProductRepositoryImpl].
 func (p *ProductRepositoryImpl) GetProductByID(id uuid.UUID) (model.Product, error) {
 	var product model.Product

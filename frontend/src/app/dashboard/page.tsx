@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Package, DownloadCloud, User, Settings, Search, ShoppingBag } from "lucide-react";
+import { Plus, Package, DownloadCloud, User, Settings, Search, ShoppingBag, DollarSign, ShoppingCart } from "lucide-react";
 import Cookies from "js-cookie";
 import api from "@/services/api";
 import ProductCard from "@/app/components/ui/ProductCard";
-import { ProductResponse } from "@/types/type";
+import { ProductResponse, TransactionResponse } from "@/types/type";
 import MyProductCard from "../components/ui/MyProductCard";
 import PurchasedProductCard from "../components/ui/PurchasedProductCard";
 
@@ -15,10 +15,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"selling" | "library" | "purchased">("selling");
   const [products, setProducts] = useState<ProductResponse[]>([]);
+  const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState("");
   const [role, setRole] = useState("");
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [analytics, setAnalytics] = useState<{ total_products: number; total_sales: number; total_revenue: number } | null>(null);
 
   useEffect(() => {
     const token = Cookies.get("token");
@@ -37,9 +39,10 @@ export default function DashboardPage() {
 
         const response = await api.get(endpoint);
         if (activeTab === "purchased") {
-          const purchasedProducts = response.data.map((transaction: any) => transaction.product);
-          setProducts(purchasedProducts);
+          setTransactions(response.data || []);
+          setProducts([]);
         } else {
+          setTransactions([]);
           setProducts(response.data || []);
         }
 
@@ -58,23 +61,24 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [activeTab, router]);
 
-  // Fetch profile data
+  // Fetch profile + analytics
   useEffect(() => {
     const fetchProfileData = async () => {
-      setIsLoading(true);
       try {
         const response = await api.get("/user/profile");
-        const fetchedUsername = response.data.name; 
-        const fetchedRole = response.data.role; 
+        const fetchedRole = response.data.role;
         setRole(fetchedRole || "");
-        setProfile(fetchedUsername || "");
+        setProfile(response.data.name || "");
+
+        if (fetchedRole === "seller") {
+          const analyticsRes = await api.get("/transaction/analytics");
+          setAnalytics(analyticsRes.data);
+        }
       } catch (error) {
         console.log("Failed to fetch data", error);
-        setProfile("");
-      } 
-    }
+      }
+    };
     fetchProfileData();
-    
   }, []);
 
   // Function to handle removal from library tab
@@ -109,6 +113,35 @@ export default function DashboardPage() {
             EDIT PROFILE
           </Link>
         </div>
+
+        {/* Seller Analytics */}
+        {analytics && (
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-white rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_#000] p-5 flex flex-col gap-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="h-5 w-5 stroke-[3px] text-pink-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-gray-500">Products</span>
+              </div>
+              <span className="text-3xl font-black text-black">{analytics.total_products}</span>
+            </div>
+            <div className="bg-white rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_#000] p-5 flex flex-col gap-1">
+              <div className="flex items-center gap-2 mb-1">
+                <ShoppingCart className="h-5 w-5 stroke-[3px] text-emerald-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-gray-500">Sales</span>
+              </div>
+              <span className="text-3xl font-black text-black">{analytics.total_sales}</span>
+            </div>
+            <div className="bg-white rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_#000] p-5 flex flex-col gap-1">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-5 w-5 stroke-[3px] text-sky-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-gray-500">Revenue</span>
+              </div>
+              <span className="text-2xl font-black text-black">
+                {analytics.total_revenue > 0 ? "Rp " + analytics.total_revenue.toLocaleString("id-ID") : "Rp 0"}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Button tabs */}
         <div className="flex flex-row mb-8 overflow-x-auto py-2 justify-between">
@@ -158,14 +191,14 @@ export default function DashboardPage() {
             <div className="h-full w-full flex items-center justify-center min-h-75">
               <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-black border-t-pink-500"></div>
             </div>
-          ) : products.length === 0 ? (
+          ) : (activeTab === "purchased" ? transactions.length === 0 : products.length === 0) ? (
             <div className="h-full w-full flex flex-col items-center justify-center min-h-75 text-center border-4 border-dashed border-gray-300 rounded-2xl p-6">
               <Package className="h-16 w-16 text-gray-300 mb-4" />
               <h2 className="text-2xl font-black text-gray-400 uppercase mb-2">
-                {activeTab === "selling" 
-                  ? "NO ASSETS FOR SALE YET" 
-                  : activeTab === "library" 
-                  ? "YOUR LIBRARY IS EMPTY" 
+                {activeTab === "selling"
+                  ? "NO ASSETS FOR SALE YET"
+                  : activeTab === "library"
+                  ? "YOUR LIBRARY IS EMPTY"
                   : "YOU HAVEN'T BOUGHT ANYTHING YET"
                 }
               </h2>
@@ -177,41 +210,43 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {products.map((product) => (
-                activeTab === "selling" ? (
-                  <MyProductCard
-                    key={product.id}
-                    id={product.id}
-                    title={product.title}
-                    price={product.price}
-                    imageUrl={product.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
-                    onDelete={() => handleRemoveProduct(product.id)}
-                  />
-                ) : activeTab === "library" ? (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    title={product.title}
-                    creator={product.seller_name ? product.seller_name : "Unknown"} 
-                    price={product.price}
-                    imageUrl={product.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
-                    isInitiallySaved={savedIds.includes(product.id)}
-                    onRemove={() => handleRemoveProduct(product.id)}
-                  />
-                ) : (
-                  <PurchasedProductCard 
-                    key={product.id}
-                    id={product.id}
-                    title={product.title}
-                    creator={product.seller_name ? product.seller_name : "Unknown"} 
-                    price={product.price}
-                    imageUrl={product.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
-                    token={Cookies.get("token") || ""}
-                  />
-                )
+              {activeTab === "selling" && products.map((product) => (
+                <MyProductCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.title}
+                  price={product.price}
+                  imageUrl={product.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
+                  onDelete={() => handleRemoveProduct(product.id)}
+                />
+              ))}
+              {activeTab === "library" && products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.title}
+                  creator={product.seller_name || "Unknown"}
+                  price={product.price}
+                  imageUrl={product.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
+                  isInitiallySaved={savedIds.includes(product.id)}
+                  onRemove={() => handleRemoveProduct(product.id)}
+                />
+              ))}
+              {activeTab === "purchased" && transactions.map((tx) => (
+                <PurchasedProductCard
+                  key={tx.id}
+                  id={tx.product?.id || tx.product_id}
+                  title={tx.product?.title || ""}
+                  creator={tx.product?.seller_name || "Unknown"}
+                  price={tx.product?.price ?? tx.amount}
+                  imageUrl={tx.product?.thumbnail_url || "https://images.unsplash.com/photo-1618331835717-801e976710b2?w=800&q=80"}
+                  token={Cookies.get("token") || ""}
+                  orderID={tx.order_id}
+                  status={tx.status}
+                  purchasedAt={tx.created_at}
+                />
               ))}
             </div>
-            
           )}
           { /* Add & explore Button */}
           <div className="flex mt-8 px-2 justify-center md:justify-end">

@@ -20,12 +20,12 @@ func NewMessageServiceImpl(messageRepository repository.MessageRepository, userR
 
 // SendMessage implements [MessageService].
 func (m *MessageServiceImpl) SendMessage(req dto.MessageRequest, senderID uuid.UUID, receiverID uuid.UUID) (dto.MessageResponse, error) {
-	_, err := m.userRepository.GetUserByID(senderID)
+	sender, err := m.userRepository.GetUserByID(senderID)
 	if err != nil {
 		return dto.MessageResponse{}, errors.New("Sender Not Found")
 	}
 
-	_, err = m.userRepository.GetUserByID(receiverID)
+	receiver, err := m.userRepository.GetUserByID(receiverID)
 	if err != nil {
 		return dto.MessageResponse{}, errors.New("Receiver Not Found")
 	}
@@ -48,8 +48,8 @@ func (m *MessageServiceImpl) SendMessage(req dto.MessageRequest, senderID uuid.U
 		ReceiverID: newMessage.ReceiverID.String(),
 		IsRead:     newMessage.IsRead,
 		Content:    newMessage.Content,
-		From:       newMessage.Sender.Name,
-		To:         newMessage.Receiver.Name,
+		From:       sender.Name,
+		To:         receiver.Name,
 		CreatedAt:  newMessage.CreatedAt.String(),
 	}
 
@@ -57,10 +57,10 @@ func (m *MessageServiceImpl) SendMessage(req dto.MessageRequest, senderID uuid.U
 }
 
 // GetChatHistory implements [MessageService].
-func (m *MessageServiceImpl) GetChatHistory(senderID uuid.UUID, receiverID uuid.UUID) ([]dto.MessageResponse, error) {
+func (m *MessageServiceImpl) GetChatHistory(senderID uuid.UUID, receiverID uuid.UUID, limit, offset int) ([]dto.MessageResponse, error) {
 	response := []dto.MessageResponse{}
 
-	messages, err := m.messageRepository.GetChatHistory(senderID, receiverID)
+	messages, err := m.messageRepository.GetChatHistory(senderID, receiverID, limit, offset)
 	if err != nil {
 		return response, err
 	}
@@ -79,6 +79,11 @@ func (m *MessageServiceImpl) GetChatHistory(senderID uuid.UUID, receiverID uuid.
 	}
 
 	return response, nil
+}
+
+// GetUnreadCount implements [MessageService].
+func (m *MessageServiceImpl) GetUnreadCount(userID uuid.UUID) (int64, error) {
+	return m.messageRepository.CountUnread(userID)
 }
 
 // GetListChat implements [MessageService].

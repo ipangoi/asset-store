@@ -13,6 +13,12 @@ type MidtransNotificationRequest struct {
 	SignatureKey      string `json:"signature_key"`
 }
 
+type SellerAnalyticsResponse struct {
+	TotalProducts int   `json:"total_products"`
+	TotalSales    int64 `json:"total_sales"`
+	TotalRevenue  int64 `json:"total_revenue"`
+}
+
 type TransactionResponse struct {
 	ID              string          `json:"id"`
 	OrderID         string          `json:"order_id"`
@@ -23,4 +29,5 @@ type TransactionResponse struct {
 	SnapRedirectURL string          `json:"snap_redirect_url"`
 	Product         ProductResponse `json:"product"`
 	IsFree          bool            `json:"is_free"`
+	CreatedAt       string          `json:"created_at"`
 }

@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, Menu, X, User, LayoutDashboard, LogOut } from "lucide-react";
+import { Search, Menu, X, User, LayoutDashboard, LogOut, MessageSquareText } from "lucide-react";
 import Cookies from "js-cookie";
+import api from "@/services/api";
 
 function NavbarContent() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +13,7 @@ function NavbarContent() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -29,6 +31,24 @@ function NavbarContent() {
     if (token) setIsLoggedIn(true);
   }, []);
 
+  // fetch unread count saat login
+  const fetchUnreadCount = async () => {
+    const token = Cookies.get("token");
+    if (!token) return;
+    try {
+      const res = await api.get("/chat/unread-count");
+      setUnreadCount(res.data.unread_count ?? 0);
+    } catch {
+      // abaikan error — badge tidak kritis
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+    window.addEventListener("focus", fetchUnreadCount);
+    return () => window.removeEventListener("focus", fetchUnreadCount);
+  }, [isLoggedIn]);
+
   //ref for profile dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -45,8 +65,15 @@ function NavbarContent() {
 
 
   // handle logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = Cookies.get("refresh_token");
+    try {
+      await api.post("/user/logout", { refresh_token: refreshToken ?? "" });
+    } catch {
+      // tetap lanjut logout meski request gagal
+    }
     Cookies.remove("token");
+    Cookies.remove("refresh_token");
     setIsLoggedIn(false);
     setIsOpen(false);
     setIsProfileOpen(false);
@@ -106,34 +133,49 @@ function NavbarContent() {
           </Link>
 
           {isLoggedIn ? (
-            <div className="relative" ref={profileRef}>
-              <button 
-                onClick={() => setIsProfileOpen(!isProfileOpen)} 
-                className="flex items-center justify-center gap-2 rounded-full bg-sky-400 px-3 py-2.5 text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all"
+            <>
+              <Link
+                href="/chat"
+                onClick={() => setUnreadCount(0)}
+                className="relative flex items-center justify-center gap-2 rounded-full bg-yellow-400 px-3 py-2.5 text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all"
               >
-                <User className="h-5 w-5 stroke-[3px]" />
-              </button>
+                <MessageSquareText className="h-5 w-5 stroke-[3px]" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center bg-red-500 border-2 border-black rounded-full text-white text-[10px] font-black shadow-[1px_1px_0px_0px_#000]">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <div className="relative" ref={profileRef}>
+                
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                  className="flex items-center justify-center gap-2 rounded-full bg-sky-400 px-3 py-2.5 text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all"
+                >
+                  <User className="h-5 w-5 stroke-[3px]" />
+                </button>
 
-              {isProfileOpen && (
-                <div className="absolute right-0 top-full mt-5 w-56 bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000] rounded-2xl flex flex-col p-3 gap-2 z-50">
-                  <Link 
-                    href="/dashboard" 
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 font-black text-black hover:bg-sky-200 rounded-xl border-2 border-transparent hover:border-black transition-all uppercase text-sm"
-                  >
-                    <LayoutDashboard className="h-5 w-5 stroke-[3px]" />
-                    Profile
-                  </Link>
-                  <button 
-                    onClick={handleLogout} 
-                    className="flex items-center gap-3 px-4 py-3 font-black text-white bg-red-500 hover:bg-red-600 rounded-xl border-2 border-black transition-all uppercase text-sm text-left cursor-pointer"
-                  >
-                    <LogOut className="h-5 w-5 stroke-[3px]" />
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+                {isProfileOpen && (
+                  <div className="absolute right-0 top-full mt-5 w-56 bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000] rounded-2xl flex flex-col p-3 gap-2 z-50">
+                    <Link 
+                      href="/dashboard" 
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 font-black text-black hover:bg-sky-200 rounded-xl border-2 border-transparent hover:border-black transition-all uppercase text-sm"
+                    >
+                      <LayoutDashboard className="h-5 w-5 stroke-[3px]" />
+                      Profile
+                    </Link>
+                    <button 
+                      onClick={handleLogout} 
+                      className="flex items-center gap-3 px-4 py-3 font-black text-white bg-red-500 hover:bg-red-600 rounded-xl border-2 border-black transition-all uppercase text-sm text-left cursor-pointer"
+                    >
+                      <LogOut className="h-5 w-5 stroke-[3px]" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <Link href={loginHref} className="rounded-full bg-amber-400 px-6 py-2.5 text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase text-sm tracking-wider">
               Login
@@ -184,16 +226,29 @@ function NavbarContent() {
 
           {isLoggedIn ? (
             <>
-              <Link 
-                href="/dashboard" 
-                onClick={() => setIsOpen(false)} 
+              <Link
+                href="/chat"
+                onClick={() => { setIsOpen(false); setUnreadCount(0); }}
+                className="relative flex justify-center items-center gap-2 rounded-2xl bg-yellow-400 py-3 text-center font-black text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase"
+              >
+                <MessageSquareText className="h-5 w-5 stroke-[3px]" />
+                CHAT
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-4 h-5 w-5 flex items-center justify-center bg-red-500 border-2 border-black rounded-full text-white text-[10px] font-black shadow-[1px_1px_0px_0px_#000]">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <Link
+                href="/dashboard"
+                onClick={() => setIsOpen(false)}
                 className="flex justify-center items-center gap-2 rounded-2xl bg-emerald-400 py-3 text-center font-black text-black border-4 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase"
               >
                 <LayoutDashboard className="h-5 w-5 stroke-[3px]" />
                 PROFILE
               </Link>
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 className="flex justify-center items-center gap-2 rounded-2xl bg-red-500 py-3 text-center font-black text-white border-4 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all uppercase"
               >
                 <LogOut className="h-5 w-5 stroke-[3px]" />

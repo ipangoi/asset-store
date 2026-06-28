@@ -9,6 +9,7 @@ import (
 type ProductService interface {
 	CreateProduct(req dto.CreateProductRequest, userID uuid.UUID) (dto.ProductResponse, error)
 	GetAllProducts(searchQuery string, limit int) ([]dto.ProductResponse, error)
+	GetAllProductsWithFilters(searchQuery, categoryID, sortBy string, minPrice, maxPrice, limit int) ([]dto.ProductResponse, error)
 	GetProductByID(id uuid.UUID) (dto.ProductResponse, error)
 	GetProductsBySeller(userID uuid.UUID) ([]dto.ProductResponse, error)
 	UpdateProduct(id uuid.UUID, product dto.UpdateProductRequest, userID uuid.UUID) (dto.ProductResponse, error)

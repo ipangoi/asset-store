@@ -73,11 +73,17 @@ func (s *UserServiceImpl) Login(req dto.UserLoginRequest) (dto.UserResponse, err
 		return dto.UserResponse{}, err
 	}
 
+	refreshToken, err := utils.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return dto.UserResponse{}, err
+	}
+
 	return dto.UserResponse{
-		ID:    user.ID.String(),
-		Email: user.Email,
-		Role:  user.Role,
-		Token: token,
+		ID:           user.ID.String(),
+		Email:        user.Email,
+		Role:         user.Role,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -161,3 +167,40 @@ func (s *UserServiceImpl) GetPublicProfile(id uuid.UUID) (dto.UserPublicProfileR
 
 	return profileResponse, nil
 }
+
+func (s *UserServiceImpl) Logout(refreshToken string) error {
+	key := "refresh_token:" + refreshToken
+	config.RedisClient.Del(config.Ctx, key)
+	return nil
+}
+
+func (s *UserServiceImpl) RefreshToken(refreshToken string) (dto.UserResponse, error) {
+	userID, err := utils.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return dto.UserResponse{}, err
+	}
+
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil {
+		return dto.UserResponse{}, errors.New("user not found")
+	}
+
+	newAccessToken, err := utils.GenerateToken(user.ID, user.Role)
+	if err != nil {
+		return dto.UserResponse{}, err
+	}
+
+	newRefreshToken, err := utils.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return dto.UserResponse{}, err
+	}
+
+	return dto.UserResponse{
+		ID:           user.ID.String(),
+		Email:        user.Email,
+		Role:         user.Role,
+		Token:        newAccessToken,
+		RefreshToken: newRefreshToken,
+	}, nil
+}
+

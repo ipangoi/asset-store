@@ -9,6 +9,7 @@ import (
 type ProductRepository interface {
 	Create(product model.Product) (model.Product, error)
 	GetAllProduct(searchQuery string, limit int) ([]model.Product, error)
+	GetAllProductWithFilters(searchQuery, categoryID, sortBy string, minPrice, maxPrice, limit int) ([]model.Product, error)
 	GetProductByID(id uuid.UUID) (model.Product, error)
 	GetProductByUserID(userID uuid.UUID) ([]model.Product, error)
 	DeleteProduct(id uuid.UUID) error

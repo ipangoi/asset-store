@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { User, Share2, Package, Check } from "lucide-react";
+import { User, Share2, Package, Check, MessageSquareText } from "lucide-react";
 import api from "@/services/api";
 import ProductCard from "@/app/components/ui/ProductCard";
 import { ProductResponse } from "@/types/type";
@@ -10,12 +10,14 @@ import Cookies from "js-cookie";
 
 export default function PublicProfilePage() {
     const { id } = useParams();
+    const router = useRouter();
     const [creator, setCreator] = useState<string>("");
     const [role, setRole] = useState<string>("");
     const [products, setProducts] = useState<ProductResponse[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [savedIds, setSavedIds] = useState<string[]>([]);
     const [isCopied, setIsCopied] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   
     const handleShare = () => {
@@ -40,8 +42,12 @@ export default function PublicProfilePage() {
             setProducts(response.data.products); 
             const token = Cookies.get("token");
             if (token) {
-            const savedRes = await api.get("/user/saved-ids");
-            setSavedIds(savedRes.data.saved_ids || []);
+                const [savedRes, profileRes] = await Promise.all([
+                    api.get("/user/saved-ids"),
+                    api.get("/user/profile"),
+                ]);
+                setSavedIds(savedRes.data.saved_ids || []);
+                setCurrentUserId(profileRes.data.id);
             }
         } catch (error) {
             console.log("Failed to fetch creator", error);
@@ -82,23 +88,35 @@ export default function PublicProfilePage() {
                 </div>
             </div>
             
-            {/* share button */}
-            <button 
-                onClick={handleShare}
-                className="flex items-center gap-2 bg-pink-500 px-5 py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all font-black text-white uppercase tracking-wider text-sm w-full md:w-auto justify-center cursor-pointer"
-            >
-                {isCopied ? (
-                    <>
-                        <Check className="h-5 w-5 stroke-[3px]" />
-                        LINK COPIED!
-                    </>
-                ) : (
-                    <>
-                        <Share2 className="h-5 w-5 stroke-[3px]" />
-                        SHARE PROFILE
-                    </>
+            {/* action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                {/* tombol chat — hanya muncul jika bukan profil sendiri dan sudah login */}
+                {currentUserId && currentUserId !== id && (
+                    <button
+                        onClick={() => router.push(`/chat?userId=${id}&name=${encodeURIComponent(creator || "Seller")}`)}
+                        className="flex items-center gap-2 bg-sky-400 px-5 py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all font-black text-black uppercase tracking-wider text-sm justify-center cursor-pointer"
+                    >
+                        <MessageSquareText className="h-5 w-5 stroke-[3px]" />
+                        CHAT SELLER
+                    </button>
                 )}
-            </button>
+                <button
+                    onClick={handleShare}
+                    className="flex items-center gap-2 bg-pink-500 px-5 py-3 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000] active:translate-y-1 active:shadow-[0px_0px_0px_0px_#000] transition-all font-black text-white uppercase tracking-wider text-sm justify-center cursor-pointer"
+                >
+                    {isCopied ? (
+                        <>
+                            <Check className="h-5 w-5 stroke-[3px]" />
+                            LINK COPIED!
+                        </>
+                    ) : (
+                        <>
+                            <Share2 className="h-5 w-5 stroke-[3px]" />
+                            SHARE PROFILE
+                        </>
+                    )}
+                </button>
+            </div>
             </div>
 
             {/* product section */}

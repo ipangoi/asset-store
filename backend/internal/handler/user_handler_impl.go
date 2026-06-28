@@ -112,3 +112,36 @@ func (u *UserHandlerImpl) GetPublicProfile(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, res)
 }
+
+func (u *UserHandlerImpl) Logout(c *gin.Context) {
+	var body struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	// best-effort bind — tetap lanjut meski body kosong
+	c.ShouldBindJSON(&body)
+
+	if body.RefreshToken != "" {
+		u.userService.Logout(body.RefreshToken)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+}
+
+func (u *UserHandlerImpl) RefreshToken(c *gin.Context) {
+	var body struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := u.userService.RefreshToken(body.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+

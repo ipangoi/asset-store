@@ -14,4 +14,5 @@ type TransactionRepository interface {
 	UpdateStatus(orderID string, status string) error
 	CheckExistingTransaction(userID uuid.UUID, productID uuid.UUID) (model.Transaction, error)
 	VerifyPurchase(userID uuid.UUID, productID uuid.UUID) (bool, error)
+	GetSellerAnalytics(sellerID uuid.UUID) (totalSales int64, totalRevenue int64, err error)
 }

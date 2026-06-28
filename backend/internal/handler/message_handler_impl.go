@@ -5,6 +5,7 @@ import (
 	"asset-store/internal/service"
 	ws "asset-store/internal/websocket"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -94,13 +95,39 @@ func (m *MessageHandlerImpl) GetChatHistory(c *gin.Context) {
 		return
 	}
 
-	res, err := m.messageService.GetChatHistory(userID, receiverID)
+	limit := 30
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	res, err := m.messageService.GetChatHistory(userID, receiverID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, res)
+}
+
+// GetUnreadCount implements [MessageHandler].
+func (m *MessageHandlerImpl) GetUnreadCount(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	count, err := m.messageService.GetUnreadCount(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"unread_count": count})
 }
 
 // GetListChat implements [MessageHandler].

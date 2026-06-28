@@ -13,13 +13,14 @@ import (
 )
 
 type ReviewServiceImpl struct {
-	reviewRepo  repository.ReviewRepository
-	productRepo repository.ProductRepository
-	userRepo    repository.UserRepository
+	reviewRepo      repository.ReviewRepository
+	productRepo     repository.ProductRepository
+	userRepo        repository.UserRepository
+	transactionRepo repository.TransactionRepository
 }
 
-func NewReviewServiceImpl(reviewRepo repository.ReviewRepository, productRepo repository.ProductRepository, userRepo repository.UserRepository) ReviewService {
-	return &ReviewServiceImpl{reviewRepo, productRepo, userRepo}
+func NewReviewServiceImpl(reviewRepo repository.ReviewRepository, productRepo repository.ProductRepository, userRepo repository.UserRepository, transactionRepo repository.TransactionRepository) ReviewService {
+	return &ReviewServiceImpl{reviewRepo, productRepo, userRepo, transactionRepo}
 }
 
 // CreateReview implements [ReviewService].
@@ -42,6 +43,11 @@ func (r *ReviewServiceImpl) CreateReview(req dto.CreateReviewRequest, productID 
 
 	if product.UserID == userID {
 		return dto.ReviewResponse{}, errors.New("You cannot review your own product")
+	}
+
+	purchased, err := r.transactionRepo.VerifyPurchase(userID, productID)
+	if err != nil || !purchased {
+		return dto.ReviewResponse{}, errors.New("You must purchase this product before reviewing it")
 	}
 
 	_, err = r.reviewRepo.GetReviewByUserIDAndProductID(userID, productID)

@@ -9,6 +9,7 @@ type MessageHandler interface {
 	UpdateMessage(c *gin.Context)
 	DeleteMessage(c *gin.Context)
 	MarkAsRead(c *gin.Context)
+	GetUnreadCount(c *gin.Context)
 
 	ServeWebSocket(c *gin.Context)
 }

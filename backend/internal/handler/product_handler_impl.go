@@ -40,6 +40,34 @@ func (h *ProductHandlerImpl) CreateProduct(c *gin.Context) {
 
 	userID := c.MustGet("user_id").(uuid.UUID)
 
+	// Validasi thumbnail: hanya gambar, max 5 MB
+	const maxThumbnailSize = 5 << 20  // 5 MB
+	const maxAssetFileSize = 200 << 20 // 200 MB
+	allowedThumbnailTypes := map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true, "image/gif": true}
+
+	if req.Thumbnail.Size > maxThumbnailSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Thumbnail must be smaller than 5 MB"})
+		return
+	}
+	if req.AssetFile.Size > maxAssetFileSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset file must be smaller than 200 MB"})
+		return
+	}
+
+	thumbSniff, err := req.Thumbnail.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open thumbnail"})
+		return
+	}
+	buf512 := make([]byte, 512)
+	thumbSniff.Read(buf512)
+	thumbSniff.Close()
+	thumbMIME := http.DetectContentType(buf512)
+	if !allowedThumbnailTypes[thumbMIME] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Thumbnail must be a JPEG, PNG, WebP, or GIF image"})
+		return
+	}
+
 	timestamp := time.Now().Unix()
 	thumbnailFileName := fmt.Sprintf("%d_%s", timestamp, filepath.Base(req.Thumbnail.Filename))
 	assetFileName := fmt.Sprintf("%d_%s", timestamp, filepath.Base(req.AssetFile.Filename))
@@ -95,9 +123,22 @@ func (h *ProductHandlerImpl) CreateProduct(c *gin.Context) {
 
 func (h *ProductHandlerImpl) GetAllProduct(c *gin.Context) {
 	searchQuery := c.Query("q")
+	categoryID := c.Query("category_id")
+	sortBy := c.Query("sort")
+	minPrice, _ := strconv.Atoi(c.Query("min_price"))
+	maxPrice, _ := strconv.Atoi(c.Query("max_price"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
 
-	limitStr := c.Query("limit")
-	limit, _ := strconv.Atoi(limitStr)
+	hasFilter := categoryID != "" || sortBy != "" || minPrice > 0 || maxPrice > 0
+	if hasFilter {
+		res, err := h.productService.GetAllProductsWithFilters(searchQuery, categoryID, sortBy, minPrice, maxPrice, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, res)
+		return
+	}
 
 	res, err := h.productService.GetAllProducts(searchQuery, limit)
 	if err != nil {
